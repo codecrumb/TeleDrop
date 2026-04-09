@@ -44,7 +44,7 @@ export async function onRequestPost(context) {
   const extraHeaders = {};
   if (remember) {
     extraHeaders['Set-Cookie'] =
-      `teledrop_auth=${token}; Path=/; Max-Age=2592000; SameSite=Strict; HttpOnly`;
+      `teledrop_auth=${token}; Path=/; Max-Age=2592000; SameSite=Strict`;
   }
 
   return json({ ok: true, token }, 200, extraHeaders);
