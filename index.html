@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TeleHost</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 64px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+      margin-bottom: 40px;
+      user-select: none;
+    }
+
+    /* ── Drop zone card ── */
+    #dropzone {
+      width: 100%;
+      max-width: 560px;
+      min-height: 300px;
+      background: #1a1a1a;
+      border: 2px dashed #333;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px 32px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+
+    #dropzone.drag-over {
+      border-color: #4a9eff;
+      background: #141c28;
+    }
+
+    #dropzone:focus-visible {
+      outline: 2px solid #4a9eff;
+      outline-offset: 2px;
+    }
+
+    /* ── Idle state ── */
+    .idle-icon {
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    .idle-text {
+      text-align: center;
+      color: #888;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .idle-text strong {
+      display: block;
+      color: #bbb;
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    /* ── Segmented control ── */
+    .seg-ctrl {
+      display: flex;
+      border: 1px solid #444;
+      border-radius: 8px;
+      overflow: hidden;
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    .seg {
+      flex: 1;
+      padding: 8px 22px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+
+    .seg:first-child {
+      border-right: 1px solid #444;
+    }
+
+    .seg.active {
+      background: #fff;
+      color: #000;
+    }
+
+    .seg:not(.active):hover {
+      background: #252525;
+      color: #ccc;
+    }
+
+    /* ── Hint text ── */
+    #hint {
+      font-size: 0.78rem;
+      color: #666;
+      text-align: center;
+      min-height: 1em;
+      transition: opacity 0.2s;
+    }
+
+    #hint.hidden {
+      visibility: hidden;
+    }
+
+    /* ── Uploading state ── */
+    #state-uploading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #333;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .uploading-label {
+      font-size: 0.9rem;
+      color: #888;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    /* ── Error state ── */
+    #state-error {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .error-icon { color: #e05252; }
+
+    .error-msg {
+      font-size: 0.9rem;
+      color: #e05252;
+      text-align: center;
+    }
+
+    /* ── Results list ── */
+    #results {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .result-item {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .result-url {
+      flex: 1;
+      font-size: 0.82rem;
+      color: #9ac8ff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .result-url:hover { text-decoration: underline; }
+
+    .copy-btn {
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #aaa;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+
+    .copy-btn:hover { border-color: #aaa; color: #fff; }
+    .copy-btn.copied { border-color: #4caf50; color: #4caf50; }
+
+    /* hidden file input */
+    #fileInput { display: none; }
+
+    /* retry link */
+    .retry-link {
+      font-size: 0.82rem;
+      color: #666;
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .retry-link:hover { color: #aaa; }
+  </style>
+</head>
+<body>
+  <h1>TeleHost</h1>
+
+  <div id="dropzone" tabindex="0" role="button" aria-label="Upload files">
+
+    <!-- Idle state (default) -->
+    <div id="state-idle" style="display:flex; flex-direction:column; align-items:center; gap:20px; width:100%;">
+      <svg class="idle-icon" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="16 16 12 12 8 16"></polyline>
+        <line x1="12" y1="12" x2="12" y2="21"></line>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+      </svg>
+
+      <div class="idle-text">
+        <strong>Drag &amp; drop or paste files here</strong>
+        or click to browse
+      </div>
+
+      <div class="seg-ctrl" id="segCtrl">
+        <button class="seg active" data-mode="compressed" type="button">Compressed</button>
+        <button class="seg" data-mode="original" type="button">Original</button>
+      </div>
+
+      <p id="hint"></p>
+    </div>
+
+    <!-- Uploading state -->
+    <div id="state-uploading">
+      <div class="spinner"></div>
+      <div class="uploading-label" id="uploadingLabel">Uploading…</div>
+    </div>
+
+    <!-- Error state -->
+    <div id="state-error">
+      <svg class="error-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <div class="error-msg" id="errorMsg">Upload failed — please try again.</div>
+      <button class="retry-link" id="retryBtn" type="button">Try again</button>
+    </div>
+
+  </div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+  <input type="file" id="fileInput" multiple>
+
+  <script>
+    (function () {
+      const dropzone      = document.getElementById('dropzone');
+      const fileInput     = document.getElementById('fileInput');
+      const stateIdle     = document.getElementById('state-idle');
+      const stateUploading= document.getElementById('state-uploading');
+      const stateError    = document.getElementById('state-error');
+      const uploadingLabel= document.getElementById('uploadingLabel');
+      const errorMsg      = document.getElementById('errorMsg');
+      const retryBtn      = document.getElementById('retryBtn');
+      const resultsEl     = document.getElementById('results');
+      const hintEl        = document.getElementById('hint');
+      const segCtrl       = document.getElementById('segCtrl');
+
+      const HINT_KEY  = 'th_hinted';
+      const HINTS = {
+        compressed: 'Smaller file, slightly lower quality',
+        original:   'Full quality, larger file',
+      };
+
+      let currentMode   = 'compressed';
+      let hintsVisible  = !localStorage.getItem(HINT_KEY);
+      let dragCounter   = 0;
+
+      // ── Segmented control ──────────────────────────────────────────────
+      function updateHint() {
+        if (!hintsVisible) return;
+        hintEl.textContent = HINTS[currentMode];
+        hintEl.classList.remove('hidden');
+      }
+
+      segCtrl.addEventListener('click', function (e) {
+        const btn = e.target.closest('.seg');
+        if (!btn) return;
+        segCtrl.querySelectorAll('.seg').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        updateHint();
+      });
+
+      // Init hints
+      if (hintsVisible) {
+        updateHint();
+      } else {
+        hintEl.classList.add('hidden');
+      }
+
+      // ── State helpers ──────────────────────────────────────────────────
+      function showIdle() {
+        stateIdle.style.display      = 'flex';
+        stateUploading.style.display = 'none';
+        stateError.style.display     = 'none';
+        dropzone.style.cursor        = 'pointer';
+      }
+
+      function showUploading(name) {
+        stateIdle.style.display      = 'none';
+        stateUploading.style.display = 'flex';
+        stateError.style.display     = 'none';
+        uploadingLabel.textContent   = 'Uploading ' + name + '…';
+        dropzone.style.cursor        = 'default';
+      }
+
+      function showError(msg) {
+        stateIdle.style.display      = 'none';
+        stateUploading.style.display = 'none';
+        stateError.style.display     = 'flex';
+        errorMsg.textContent         = msg || 'Upload failed — please try again.';
+        dropzone.style.cursor        = 'pointer';
+      }
+
+      retryBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        showIdle();
+      });
+
+      // ── Drag & drop ────────────────────────────────────────────────────
+      document.body.addEventListener('dragenter', function (e) {
+        e.preventDefault();
+        dragCounter++;
+        dropzone.classList.add('drag-over');
+      });
+
+      document.body.addEventListener('dragover', function (e) {
+        e.preventDefault();
+      });
+
+      document.body.addEventListener('dragleave', function (e) {
+        dragCounter--;
+        if (dragCounter <= 0) {
+          dragCounter = 0;
+          dropzone.classList.remove('drag-over');
+        }
+      });
+
+      document.body.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dragCounter = 0;
+        dropzone.classList.remove('drag-over');
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length) handleFiles(files);
+      });
+
+      // ── Click to upload ────────────────────────────────────────────────
+      dropzone.addEventListener('click', function (e) {
+        if (e.target.closest('.seg-ctrl')) return; // let seg control handle its own clicks
+        if (e.target === retryBtn) return;
+        fileInput.click();
+      });
+
+      dropzone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener('change', function () {
+        const files = Array.from(fileInput.files);
+        if (files.length) handleFiles(files);
+        fileInput.value = '';
+      });
+
+      // ── Paste ──────────────────────────────────────────────────────────
+      document.addEventListener('paste', function (e) {
+        const items = Array.from(e.clipboardData.items).filter(i => i.kind === 'file');
+        if (!items.length) return;
+        e.preventDefault();
+        const files = items.map(i => i.getAsFile()).filter(Boolean);
+        if (files.length) handleFiles(files);
+      });
+
+      // ── Upload logic ───────────────────────────────────────────────────
+      async function handleFiles(files) {
+        for (const file of files) {
+          await uploadFile(file);
+        }
+      }
+
+      async function uploadFile(file) {
+        showUploading(file.name);
+
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('compressionMode', currentMode);
+
+        try {
+          const res = await fetch('/upload', { method: 'POST', body: fd });
+          const data = await res.json();
+
+          if (!res.ok) {
+            const errText = (data && data.error) ? data.error : 'Server error (' + res.status + ')';
+            showError(errText);
+            return;
+          }
+
+          // Dismiss hints permanently after first successful upload
+          if (hintsVisible) {
+            hintsVisible = false;
+            localStorage.setItem(HINT_KEY, '1');
+            hintEl.classList.add('hidden');
+          }
+
+          if (Array.isArray(data) && data.length > 0) {
+            data.forEach(function (item) {
+              addResult(window.location.origin + item.src);
+            });
+          }
+
+          showIdle();
+        } catch (err) {
+          showError('Network error — check your connection.');
+        }
+      }
+
+      // ── Result items ───────────────────────────────────────────────────
+      function addResult(url) {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+
+        const link = document.createElement('a');
+        link.className    = 'result-url';
+        link.href         = url;
+        link.target       = '_blank';
+        link.rel          = 'noopener noreferrer';
+        link.textContent  = url;
+        link.title        = url;
+
+        const btn = document.createElement('button');
+        btn.className   = 'copy-btn';
+        btn.type        = 'button';
+        btn.textContent = 'Copy';
+
+        btn.addEventListener('click', function () {
+          navigator.clipboard.writeText(url).then(function () {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function () {
+              btn.textContent = 'Copy';
+              btn.classList.remove('copied');
+            }, 2000);
+          }).catch(function () {
+            // Fallback for browsers without clipboard API
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function () {
+              btn.textContent = 'Copy';
+              btn.classList.remove('copied');
+            }, 2000);
+          });
+        });
+
+        item.appendChild(link);
+        item.appendChild(btn);
+        resultsEl.appendChild(item);
+      }
+    })();
+  </script>
+</body>
+</html>
