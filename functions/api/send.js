@@ -11,17 +11,13 @@ async function computeToken(env) {
 async function verifyAuth(request, env) {
   const expected = await computeToken(env);
 
-  // Check HttpOnly cookie
   const cookieHeader = request.headers.get('Cookie') || '';
   const cm = cookieHeader.match(/(?:^|;\s*)teledrop_auth=([^;]+)/);
   if (cm && cm[1] === expected) return true;
 
-  // Check Authorization: Bearer <token>
   const authHeader = request.headers.get('Authorization') || '';
   const am = authHeader.match(/^Bearer (.+)$/);
-  if (am && am[1] === expected) return true;
-
-  return false;
+  return am ? am[1] === expected : false;
 }
 
 function json(data, status = 200) {
@@ -29,6 +25,20 @@ function json(data, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function ipSpoiler(request) {
+  const ip = request.headers.get('cf-connecting-ip')
+    || (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+    || '';
+  return ip ? `\n<tg-spoiler>📍 ${escapeHtml(ip)}</tg-spoiler>` : '';
 }
 
 export async function onRequestPost(context) {
@@ -65,15 +75,13 @@ export async function onRequestPost(context) {
     content = body.content;
   }
 
-  if (!type) {
-    return json({ error: 'Missing type field' }, 400);
-  }
+  if (!type) return json({ error: 'Missing type field' }, 400);
 
-  // File size guard (CF Pages Functions cap: 100 MB)
   if (file && file.size > 100 * 1024 * 1024) {
     return json({ error: 'File too large — maximum size is 100 MB' }, 413);
   }
 
+  const spoiler = ipSpoiler(request);
   const apiBase = `https://api.telegram.org/bot${env.BOT_TOKEN}`;
   let tgRes;
 
@@ -81,22 +89,23 @@ export async function onRequestPost(context) {
     const fd = new FormData();
     fd.append('chat_id', env.CHAT_ID);
     fd.append('photo', file);
+    if (spoiler) { fd.append('caption', spoiler.trim()); fd.append('parse_mode', 'HTML'); }
     tgRes = await fetch(`${apiBase}/sendPhoto`, { method: 'POST', body: fd });
 
   } else if (type === 'file' && file) {
     const fd = new FormData();
     fd.append('chat_id', env.CHAT_ID);
     fd.append('document', file);
+    if (spoiler) { fd.append('caption', spoiler.trim()); fd.append('parse_mode', 'HTML'); }
     tgRes = await fetch(`${apiBase}/sendDocument`, { method: 'POST', body: fd });
 
   } else if (type === 'text' || type === 'link') {
-    if (!content || !content.trim()) {
-      return json({ error: 'Missing content' }, 400);
-    }
+    if (!content || !content.trim()) return json({ error: 'Missing content' }, 400);
     const prefix = type === 'link' ? '🔗' : '📝';
     const fd = new FormData();
     fd.append('chat_id', env.CHAT_ID);
-    fd.append('text', `${prefix} ${content.trim()}`);
+    fd.append('text', `${prefix} ${content.trim()}${spoiler}`);
+    fd.append('parse_mode', 'HTML');
     tgRes = await fetch(`${apiBase}/sendMessage`, { method: 'POST', body: fd });
 
   } else {
@@ -114,9 +123,5 @@ export async function onRequestPost(context) {
     return json({ error: tgData.description || 'Telegram API error' }, 502);
   }
 
-  return json({
-    ok: true,
-    messageId: tgData.result.message_id,
-    chatId: env.CHAT_ID,
-  });
+  return json({ ok: true, messageId: tgData.result.message_id, chatId: env.CHAT_ID });
 }

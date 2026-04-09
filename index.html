@@ -54,11 +54,7 @@
       letter-spacing: -0.5px;
     }
 
-    #pin-card p {
-      font-size: 0.82rem;
-      color: #555;
-      margin-top: -6px;
-    }
+    #pin-card p { font-size: 0.82rem; color: #555; margin-top: -6px; }
 
     #pin-input {
       width: 100%;
@@ -118,12 +114,7 @@
     #pin-submit:hover { background: #6ab4ff; }
     #pin-submit:disabled { opacity: 0.45; cursor: default; }
 
-    #pin-error {
-      font-size: 0.8rem;
-      color: #e05252;
-      min-height: 1em;
-      text-align: center;
-    }
+    #pin-error { font-size: 0.8rem; color: #e05252; min-height: 1em; text-align: center; }
 
     /* ── Main App ─────────────────────────────────────────────────────── */
     #app {
@@ -200,10 +191,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 28px 24px;
+      padding: 24px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s, opacity 0.15s;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
       position: relative;
     }
 
@@ -218,7 +209,7 @@
       cursor: default;
     }
 
-    /* Drop zone inner states */
+    /* ── Drop zone: idle state ────────────────────────────────────────── */
     .dz-idle {
       display: flex;
       flex-direction: column;
@@ -227,7 +218,15 @@
       text-align: center;
     }
 
-    .dz-file {
+    #drop-zone[data-state="files"] .dz-idle { display: none; }
+
+    .dz-icon { color: #383838; }
+
+    .dz-label { color: #555; font-size: 0.88rem; line-height: 1.5; }
+    .dz-label strong { display: block; color: #888; font-size: 0.92rem; margin-bottom: 2px; }
+
+    /* ── Drop zone: files state ───────────────────────────────────────── */
+    .dz-files-view {
       display: none;
       flex-direction: column;
       align-items: center;
@@ -235,69 +234,95 @@
       width: 100%;
     }
 
-    #drop-zone[data-state="file"] .dz-idle { display: none; }
-    #drop-zone[data-state="file"] .dz-file { display: flex; }
+    #drop-zone[data-state="files"] .dz-files-view { display: flex; }
 
-    .dz-icon { color: #383838; }
-
-    .dz-label { color: #555; font-size: 0.88rem; line-height: 1.5; }
-    .dz-label strong { display: block; color: #888; font-size: 0.92rem; margin-bottom: 2px; }
-
-    /* Image preview */
-    #img-preview {
-      display: none;
-      max-width: 260px;
-      max-height: 170px;
-      border-radius: 8px;
-      object-fit: contain;
-      border: 1px solid #2a2a2a;
+    .file-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      width: 100%;
+      max-height: 220px;
+      overflow-y: auto;
     }
 
-    #img-preview.visible { display: block; }
+    /* Image chip */
+    .file-chip-img {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      flex-shrink: 0;
+    }
 
-    /* File info card */
-    #file-info {
-      display: none;
+    .file-chip-img img {
+      width: 76px;
+      height: 76px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+      display: block;
+    }
+
+    /* Doc chip */
+    .file-chip-doc {
+      position: relative;
+      display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 7px;
       background: #0f0f0f;
       border: 1px solid #222;
-      border-radius: 10px;
-      padding: 12px 14px;
-      width: 100%;
-      max-width: 360px;
+      border-radius: 8px;
+      padding: 9px 28px 9px 10px;
+      max-width: 180px;
+      flex-shrink: 0;
     }
 
-    #file-info.visible { display: flex; }
+    .chip-doc-icon { color: #444; flex-shrink: 0; }
 
-    .file-icon { color: #444; flex-shrink: 0; }
-
-    .file-meta { flex: 1; min-width: 0; }
-
-    .file-name {
-      font-size: 0.85rem;
-      color: #ccc;
+    .chip-name {
+      font-size: 0.74rem;
+      color: #999;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .file-size { font-size: 0.73rem; color: #505050; margin-top: 2px; }
-
-    #clear-file {
-      background: transparent;
-      border: none;
-      color: #444;
-      font-size: 1.15rem;
+    /* Remove button (shared) */
+    .chip-remove {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 18px;
+      height: 18px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 50%;
+      color: #aaa;
+      font-size: 0.7rem;
       line-height: 1;
-      padding: 4px 6px;
       cursor: pointer;
-      border-radius: 4px;
-      flex-shrink: 0;
-      transition: color 0.12s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s, color 0.1s;
+      padding: 0;
     }
 
-    #clear-file:hover { color: #aaa; }
+    .chip-remove:hover { background: #444; color: #fff; }
+
+    .dz-add-hint {
+      font-size: 0.74rem;
+      color: #383838;
+    }
+
+    /* ── Drop warning ─────────────────────────────────────────────────── */
+    #drop-warning {
+      font-size: 0.78rem;
+      color: #e05252;
+      min-height: 1.1em;
+      margin-bottom: 4px;
+      text-align: center;
+    }
 
     /* ── Text input ───────────────────────────────────────────────────── */
     #text-input {
@@ -361,11 +386,7 @@
       text-align: center;
     }
 
-    /* Sending */
-    #state-sending {
-      background: #141414;
-      border: 1px solid #222;
-    }
+    #state-sending { background: #141414; border: 1px solid #222; }
 
     .spinner {
       width: 30px; height: 30px;
@@ -379,21 +400,22 @@
 
     .sending-label { font-size: 0.85rem; color: #555; }
 
-    /* Success */
-    #state-success {
-      background: #0c1a0c;
-      border: 1px solid #1a3a1a;
-    }
+    #state-success { background: #0c1a0c; border: 1px solid #1a3a1a; }
 
     .success-icon { color: #4caf50; }
 
-    .success-label {
-      font-size: 0.92rem;
-      color: #72c472;
-      font-weight: 500;
+    .success-label { font-size: 0.92rem; color: #72c472; font-weight: 500; }
+
+    /* Telegram links container */
+    #tg-links {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
     }
 
-    #tg-link {
+    .tg-link {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -406,9 +428,10 @@
       padding: 9px 16px;
       text-decoration: none;
       transition: background 0.12s;
+      white-space: nowrap;
     }
 
-    #tg-link:hover { background: #1a2e1a; }
+    .tg-link:hover { background: #1a2e1a; }
 
     #send-another {
       background: transparent;
@@ -423,11 +446,7 @@
 
     #send-another:hover { border-color: #4caf50; color: #72c472; }
 
-    /* Error */
-    #state-error {
-      background: #1a0c0c;
-      border: 1px solid #3a1a1a;
-    }
+    #state-error { background: #1a0c0c; border: 1px solid #3a1a1a; }
 
     .error-icon { color: #e05252; }
     .error-msg { font-size: 0.88rem; color: #c47272; }
@@ -482,7 +501,7 @@
       </button>
     </header>
 
-    <!-- Input form (hidden during status states) -->
+    <!-- Input form -->
     <div id="input-form">
       <!-- Mode tabs -->
       <div class="mode-tabs" id="mode-tabs" role="tablist">
@@ -494,6 +513,8 @@
 
       <!-- Drop zone -->
       <div id="drop-zone" data-state="idle" tabindex="0" role="button" aria-label="Drop files here or click to browse">
+
+        <!-- Idle state -->
         <div class="dz-idle">
           <svg class="dz-icon" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polyline points="16 16 12 12 8 16"></polyline>
@@ -501,25 +522,21 @@
             <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
           </svg>
           <div class="dz-label">
-            <strong>Drop a file here</strong>
+            <strong>Drop files here</strong>
             or click to browse
           </div>
         </div>
-        <div class="dz-file">
-          <img id="img-preview" alt="Preview">
-          <div id="file-info">
-            <svg class="file-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-              <polyline points="13 2 13 9 20 9"></polyline>
-            </svg>
-            <div class="file-meta">
-              <div class="file-name" id="file-name-label"></div>
-              <div class="file-size" id="file-size-label"></div>
-            </div>
-            <button id="clear-file" type="button" aria-label="Remove file">×</button>
-          </div>
+
+        <!-- Files staged state -->
+        <div class="dz-files-view">
+          <div class="file-chips" id="file-chips"></div>
+          <div class="dz-add-hint">drop or click to add more</div>
         </div>
+
       </div>
+
+      <!-- Drop warning (oversized files etc.) -->
+      <div id="drop-warning"></div>
 
       <!-- Text input -->
       <textarea id="text-input" placeholder="Paste a link or type a note…" rows="3" spellcheck="true"></textarea>
@@ -534,7 +551,7 @@
     <!-- Sending state -->
     <div id="state-sending" class="status-card" role="status" aria-live="polite">
       <div class="spinner"></div>
-      <div class="sending-label">Sending…</div>
+      <div class="sending-label" id="sending-label">Sending…</div>
     </div>
 
     <!-- Success state -->
@@ -543,10 +560,8 @@
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
         <polyline points="22 4 12 14.01 9 11.01"></polyline>
       </svg>
-      <div class="success-label">Sent to Telegram</div>
-      <a id="tg-link" href="#" target="_blank" rel="noopener noreferrer">
-        View in Telegram →
-      </a>
+      <div class="success-label" id="success-label">Sent to Telegram</div>
+      <div id="tg-links"></div>
       <button id="send-another" type="button">Send another</button>
     </div>
 
@@ -562,13 +577,13 @@
     </div>
   </div>
 
-  <input type="file" id="file-input">
+  <input type="file" id="file-input" multiple>
 
   <script>
     (function () {
       'use strict';
 
-      // ── Elements ────────────────────────────────────────────────────────
+      // ── Elements ─────────────────────────────────────────────────────────
       const pinOverlay   = document.getElementById('pin-overlay');
       const pinInput     = document.getElementById('pin-input');
       const rememberMe   = document.getElementById('remember-me');
@@ -579,29 +594,30 @@
       const modeTabs     = document.getElementById('mode-tabs');
       const dropZone     = document.getElementById('drop-zone');
       const fileInput    = document.getElementById('file-input');
-      const imgPreview   = document.getElementById('img-preview');
-      const fileInfoEl   = document.getElementById('file-info');
-      const fileNameLbl  = document.getElementById('file-name-label');
-      const fileSizeLbl  = document.getElementById('file-size-label');
-      const clearFileBtn = document.getElementById('clear-file');
+      const fileChips    = document.getElementById('file-chips');
+      const dropWarning  = document.getElementById('drop-warning');
       const textInput    = document.getElementById('text-input');
       const typeBadge    = document.getElementById('type-badge');
       const sendBtn      = document.getElementById('send-btn');
       const inputForm    = document.getElementById('input-form');
       const stateSending = document.getElementById('state-sending');
+      const sendingLabel = document.getElementById('sending-label');
       const stateSuccess = document.getElementById('state-success');
-      const stateError   = document.getElementById('state-error');
-      const tgLink       = document.getElementById('tg-link');
+      const successLabel = document.getElementById('success-label');
+      const tgLinks      = document.getElementById('tg-links');
       const sendAnother  = document.getElementById('send-another');
-      const retryBtn     = document.getElementById('retry-btn');
+      const stateError   = document.getElementById('state-error');
       const errorMsgEl   = document.getElementById('error-msg');
+      const retryBtn     = document.getElementById('retry-btn');
 
-      // ── App state ────────────────────────────────────────────────────────
-      let mode       = 'auto';
-      let stagedFile = null;
+      // ── App state ─────────────────────────────────────────────────────────
+      let mode = 'auto';
+      // Each entry: { file: File, previewUrl: string|null }
+      let stagedFiles = [];
       let dragCounter = 0;
+      let warnTimer = null;
 
-      // ── Auth ─────────────────────────────────────────────────────────────
+      // ── Auth ──────────────────────────────────────────────────────────────
       function getToken() {
         const s = sessionStorage.getItem('teledrop_token');
         if (s) return s;
@@ -609,9 +625,7 @@
         return m ? decodeURIComponent(m[1]) : null;
       }
 
-      function saveToken(token) {
-        sessionStorage.setItem('teledrop_token', token);
-      }
+      function saveToken(t) { sessionStorage.setItem('teledrop_token', t); }
 
       function clearToken() {
         sessionStorage.removeItem('teledrop_token');
@@ -632,18 +646,13 @@
         app.hidden = false;
       }
 
-      // ── Init ─────────────────────────────────────────────────────────────
-      if (getToken()) {
-        showApp();
-      } else {
-        showPinOverlay();
-      }
+      // Init
+      getToken() ? showApp() : showPinOverlay();
 
-      // ── PIN flow ─────────────────────────────────────────────────────────
+      // ── PIN flow ──────────────────────────────────────────────────────────
       async function submitPin() {
         const pin = pinInput.value;
         if (!pin) return;
-
         pinSubmit.disabled = true;
         pinError.textContent = '';
 
@@ -654,11 +663,9 @@
             body: JSON.stringify({ pin, remember: rememberMe.checked }),
           });
           const data = await res.json();
-
           if (!res.ok) {
             pinError.textContent = data.error || 'Incorrect PIN';
             pinInput.classList.remove('shake');
-            // Force reflow to restart animation
             void pinInput.offsetWidth;
             pinInput.classList.add('shake');
             pinInput.select();
@@ -675,12 +682,7 @@
 
       pinSubmit.addEventListener('click', submitPin);
       pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitPin(); });
-
-      // ── Lock ─────────────────────────────────────────────────────────────
-      lockBtn.addEventListener('click', () => {
-        clearToken();
-        showPinOverlay();
-      });
+      lockBtn.addEventListener('click', () => { clearToken(); showPinOverlay(); });
 
       // ── Mode tabs ─────────────────────────────────────────────────────────
       modeTabs.addEventListener('click', (e) => {
@@ -694,20 +696,12 @@
         tab.setAttribute('aria-selected', 'true');
         mode = tab.dataset.mode;
 
-        // In text/link mode, clear any staged file
-        if (mode === 'text' || mode === 'link') clearFile();
-
-        // Dim drop zone in text/link mode
+        if (mode === 'text' || mode === 'link') clearFiles();
         dropZone.classList.toggle('dimmed', mode === 'text' || mode === 'link');
 
-        // Update textarea placeholder
-        if (mode === 'link') {
-          textInput.placeholder = 'Paste a URL…';
-        } else if (mode === 'text') {
-          textInput.placeholder = 'Type a note…';
-        } else {
-          textInput.placeholder = 'Paste a link or type a note…';
-        }
+        textInput.placeholder = mode === 'link' ? 'Paste a URL…'
+          : mode === 'text' ? 'Type a note…'
+          : 'Paste a link or type a note…';
 
         refreshBadgeAndBtn();
       });
@@ -715,29 +709,27 @@
       // ── Type detection ────────────────────────────────────────────────────
       function detectType() {
         if (mode === 'file') {
-          if (!stagedFile) return null;
-          return stagedFile.type.startsWith('image/') ? 'image' : 'file';
+          return stagedFiles.length ? 'files' : null;
         }
-        if (mode === 'text') {
-          return textInput.value.trim() ? 'text' : null;
-        }
-        if (mode === 'link') {
-          return textInput.value.trim() ? 'link' : null;
-        }
+        if (mode === 'text') return textInput.value.trim() ? 'text' : null;
+        if (mode === 'link') return textInput.value.trim() ? 'link' : null;
         // Auto
-        if (stagedFile) return stagedFile.type.startsWith('image/') ? 'image' : 'file';
+        if (stagedFiles.length) return 'files';
         const t = textInput.value.trim();
         if (!t) return null;
         return /^https?:\/\//i.test(t) ? 'link' : 'text';
       }
 
-      const TYPE_LABELS = { image: '📷 Image', file: '📎 File', link: '🔗 Link', text: '📝 Text note' };
+      const TYPE_LABELS = { files: '📎 Files', link: '🔗 Link', text: '📝 Text note' };
 
       function refreshBadgeAndBtn() {
         const type = detectType();
 
         if (mode === 'auto' && type) {
-          typeBadge.textContent = 'Detected: ' + TYPE_LABELS[type];
+          const label = type === 'files'
+            ? (stagedFiles.length === 1 ? '📎 File' : `📎 ${stagedFiles.length} files`)
+            : TYPE_LABELS[type];
+          typeBadge.textContent = 'Detected: ' + label;
           typeBadge.classList.add('active');
         } else {
           typeBadge.textContent = '';
@@ -749,51 +741,95 @@
 
       textInput.addEventListener('input', refreshBadgeAndBtn);
 
-      // ── File handling ──────────────────────────────────────────────────────
-      function stageFile(file) {
-        if (!file) return;
-
-        if (file.size > 100 * 1024 * 1024) {
-          showError('File too large — maximum size is 100 MB');
-          return;
-        }
-
-        stagedFile = file;
-        dropZone.dataset.state = 'file';
-
-        if (file.type.startsWith('image/')) {
-          if (imgPreview.src && imgPreview.src.startsWith('blob:')) {
-            URL.revokeObjectURL(imgPreview.src);
+      // ── File management ───────────────────────────────────────────────────
+      function addFiles(fileList) {
+        const oversized = [];
+        for (const file of fileList) {
+          if (file.size > 100 * 1024 * 1024) {
+            oversized.push(file.name);
+            continue;
           }
-          imgPreview.src = URL.createObjectURL(file);
-          imgPreview.classList.add('visible');
-          fileInfoEl.classList.remove('visible');
-        } else {
-          imgPreview.classList.remove('visible');
-          fileInfoEl.classList.add('visible');
-          fileNameLbl.textContent = file.name;
-          fileSizeLbl.textContent = formatSize(file.size);
+          const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+          stagedFiles.push({ file, previewUrl });
         }
-
+        if (oversized.length) {
+          const names = oversized.length === 1
+            ? `"${oversized[0]}" is`
+            : `${oversized.length} files are`;
+          showDropWarning(`${names} over the 100 MB limit and were skipped.`);
+        }
+        renderChips();
         refreshBadgeAndBtn();
       }
 
-      function clearFile() {
-        if (stagedFile && imgPreview.src.startsWith('blob:')) {
-          URL.revokeObjectURL(imgPreview.src);
-        }
-        stagedFile = null;
-        dropZone.dataset.state = 'idle';
-        imgPreview.classList.remove('visible');
-        imgPreview.src = '';
-        fileInfoEl.classList.remove('visible');
+      function removeFileAt(index) {
+        const item = stagedFiles[index];
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        stagedFiles.splice(index, 1);
+        renderChips();
         refreshBadgeAndBtn();
       }
 
-      clearFileBtn.addEventListener('click', (e) => { e.stopPropagation(); clearFile(); });
+      function clearFiles() {
+        stagedFiles.forEach(item => { if (item.previewUrl) URL.revokeObjectURL(item.previewUrl); });
+        stagedFiles = [];
+        renderChips();
+        refreshBadgeAndBtn();
+      }
 
+      function renderChips() {
+        fileChips.innerHTML = '';
+        dropZone.dataset.state = stagedFiles.length ? 'files' : 'idle';
+
+        stagedFiles.forEach((item, i) => {
+          const chip = document.createElement('div');
+
+          if (item.previewUrl) {
+            chip.className = 'file-chip-img';
+            const img = document.createElement('img');
+            img.src = item.previewUrl;
+            img.alt = item.file.name;
+            img.title = item.file.name;
+            chip.appendChild(img);
+          } else {
+            chip.className = 'file-chip-doc';
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('class', 'chip-doc-icon');
+            icon.setAttribute('width', '16'); icon.setAttribute('height', '16');
+            icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('fill', 'none');
+            icon.setAttribute('stroke', 'currentColor'); icon.setAttribute('stroke-width', '1.8');
+            icon.setAttribute('stroke-linecap', 'round'); icon.setAttribute('stroke-linejoin', 'round');
+            icon.innerHTML = '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline>';
+            const name = document.createElement('span');
+            name.className = 'chip-name';
+            name.textContent = item.file.name;
+            name.title = item.file.name;
+            chip.appendChild(icon);
+            chip.appendChild(name);
+          }
+
+          const rmBtn = document.createElement('button');
+          rmBtn.className = 'chip-remove';
+          rmBtn.type = 'button';
+          rmBtn.textContent = '×';
+          rmBtn.setAttribute('aria-label', 'Remove ' + item.file.name);
+          rmBtn.addEventListener('click', (e) => { e.stopPropagation(); removeFileAt(i); });
+          chip.appendChild(rmBtn);
+
+          fileChips.appendChild(chip);
+        });
+      }
+
+      function showDropWarning(msg) {
+        dropWarning.textContent = msg;
+        clearTimeout(warnTimer);
+        warnTimer = setTimeout(() => { dropWarning.textContent = ''; }, 5000);
+      }
+
+      // ── Drop zone interactions ────────────────────────────────────────────
       dropZone.addEventListener('click', (e) => {
-        if (e.target === clearFileBtn || dropZone.classList.contains('dimmed')) return;
+        if (e.target.closest('.chip-remove')) return;
+        if (dropZone.classList.contains('dimmed')) return;
         fileInput.click();
       });
 
@@ -805,11 +841,10 @@
       });
 
       fileInput.addEventListener('change', () => {
-        if (fileInput.files[0]) stageFile(fileInput.files[0]);
+        if (fileInput.files.length) addFiles(Array.from(fileInput.files));
         fileInput.value = '';
       });
 
-      // Drag & drop
       document.body.addEventListener('dragenter', (e) => {
         e.preventDefault();
         dragCounter++;
@@ -830,8 +865,8 @@
         dragCounter = 0;
         dropZone.classList.remove('drag-over');
         if (dropZone.classList.contains('dimmed')) return;
-        const file = e.dataTransfer.files[0];
-        if (file) stageFile(file);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length) addFiles(files);
       });
 
       // Paste files
@@ -840,8 +875,8 @@
         const items = Array.from(e.clipboardData.items).filter(i => i.kind === 'file');
         if (!items.length) return;
         e.preventDefault();
-        const file = items[0].getAsFile();
-        if (file) stageFile(file);
+        const files = items.map(i => i.getAsFile()).filter(Boolean);
+        if (files.length) addFiles(files);
       });
 
       // ── Send ──────────────────────────────────────────────────────────────
@@ -854,15 +889,41 @@
         const token = getToken();
         if (!token) { showPinOverlay(); return; }
 
-        showSending();
+        if (type === 'text' || type === 'link') {
+          setSendingLabel('Sending…');
+          showSending();
+          const result = await sendPayload(type, null, textInput.value.trim(), token);
+          if (!result) return;
+          showSuccess([buildTgLink(result.chatId, result.messageId)], 1);
+        } else {
+          // files — send sequentially
+          const snapshot = [...stagedFiles];
+          const links = [];
 
+          for (let i = 0; i < snapshot.length; i++) {
+            setSendingLabel(snapshot.length > 1
+              ? `Sending ${i + 1} of ${snapshot.length}…`
+              : 'Sending…');
+            showSending();
+
+            const { file } = snapshot[i];
+            const fileType = file.type.startsWith('image/') ? 'image' : 'file';
+            const result = await sendPayload(fileType, file, null, token);
+            if (!result) return; // error already shown
+            links.push(buildTgLink(result.chatId, result.messageId));
+          }
+
+          showSuccess(links, snapshot.length);
+        }
+      }
+
+      async function sendPayload(type, file, content, token) {
         try {
           let res;
-
-          if (type === 'image' || type === 'file') {
+          if (file) {
             const fd = new FormData();
             fd.append('type', type);
-            fd.append('file', stagedFile);
+            fd.append('file', file);
             res = await fetch('/api/send', {
               method: 'POST',
               headers: { 'Authorization': 'Bearer ' + token },
@@ -875,77 +936,81 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
               },
-              body: JSON.stringify({ type, content: textInput.value.trim() }),
+              body: JSON.stringify({ type, content }),
             });
           }
 
-          if (res.status === 401) {
-            clearToken();
-            showPinOverlay();
-            return;
-          }
+          if (res.status === 401) { clearToken(); showPinOverlay(); return null; }
 
           const data = await res.json();
-
-          if (!res.ok) {
-            showError(data.error || 'Send failed (' + res.status + ')');
-            return;
-          }
-
-          const linkId = String(data.chatId).replace(/^-100/, '');
-          tgLink.href = `https://t.me/c/${linkId}/${data.messageId}`;
-          showSuccess();
-
+          if (!res.ok) { showError(data.error || 'Send failed (' + res.status + ')'); return null; }
+          return data;
         } catch {
           showError('Network error — check your connection.');
+          return null;
         }
+      }
+
+      function buildTgLink(chatId, messageId) {
+        const linkId = String(chatId).replace(/^-100/, '');
+        return `https://t.me/c/${linkId}/${messageId}`;
       }
 
       // ── UI state helpers ──────────────────────────────────────────────────
       function showIdle() {
-        inputForm.style.display = '';
+        inputForm.style.display    = '';
         stateSending.style.display = 'none';
-        stateSuccess.style.display  = 'none';
-        stateError.style.display    = 'none';
+        stateSuccess.style.display = 'none';
+        stateError.style.display   = 'none';
       }
 
       function showSending() {
         inputForm.style.display    = 'none';
         stateSending.style.display = 'flex';
-        stateSuccess.style.display  = 'none';
-        stateError.style.display    = 'none';
+        stateSuccess.style.display = 'none';
+        stateError.style.display   = 'none';
       }
 
-      function showSuccess() {
+      function setSendingLabel(text) { sendingLabel.textContent = text; }
+
+      function showSuccess(links, count) {
         inputForm.style.display    = 'none';
         stateSending.style.display = 'none';
-        stateSuccess.style.display  = 'flex';
-        stateError.style.display    = 'none';
+        stateSuccess.style.display = 'flex';
+        stateError.style.display   = 'none';
+
+        successLabel.textContent = count > 1
+          ? `Sent ${count} files to Telegram`
+          : 'Sent to Telegram';
+
+        tgLinks.innerHTML = '';
+        links.forEach((href, i) => {
+          const a = document.createElement('a');
+          a.className = 'tg-link';
+          a.href = href;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = links.length > 1 ? `View message ${i + 1} →` : 'View in Telegram →';
+          tgLinks.appendChild(a);
+        });
       }
 
       function showError(msg) {
         inputForm.style.display    = 'none';
         stateSending.style.display = 'none';
-        stateSuccess.style.display  = 'none';
-        stateError.style.display    = 'flex';
+        stateSuccess.style.display = 'none';
+        stateError.style.display   = 'flex';
         errorMsgEl.textContent = msg || 'Something went wrong.';
       }
 
       sendAnother.addEventListener('click', () => {
-        clearFile();
+        clearFiles();
         textInput.value = '';
         refreshBadgeAndBtn();
         showIdle();
       });
 
       retryBtn.addEventListener('click', showIdle);
-
-      // ── Utilities ─────────────────────────────────────────────────────────
-      function formatSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-      }
 
     })();
   </script>
