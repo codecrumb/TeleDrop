@@ -203,11 +203,8 @@
       background: #0c1620;
     }
 
-    #drop-zone.dimmed {
-      opacity: 0.28;
-      pointer-events: none;
-      cursor: default;
-    }
+    #drop-zone.dimmed { display: none; }
+    #text-input.hidden { display: none; }
 
     /* ── Drop zone: idle state ────────────────────────────────────────── */
     .dz-idle {
@@ -699,6 +696,7 @@
 
         if (mode === 'text' || mode === 'link') clearFiles();
         dropZone.classList.toggle('dimmed', mode === 'text' || mode === 'link');
+        textInput.classList.toggle('hidden', mode === 'file');
 
         textInput.placeholder = mode === 'link' ? 'Paste a URL…'
           : mode === 'text' ? 'Type a note…'
