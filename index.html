@@ -400,7 +400,8 @@
 
     .sending-label { font-size: 0.85rem; color: #555; }
 
-    #state-success { background: #0c1a0c; border: 1px solid #1a3a1a; }
+    #state-success { background: #0c1a0c; border: 1px solid #1a3a1a; transition: background 0.15s, border-color 0.15s; }
+    #state-success.drag-over { background: #0f2a0f; border-color: #4caf50; }
 
     .success-icon { color: #4caf50; }
 
@@ -845,10 +846,16 @@
         fileInput.value = '';
       });
 
+      function inSuccessState() { return stateSuccess.style.display === 'flex'; }
+
       document.body.addEventListener('dragenter', (e) => {
         e.preventDefault();
         dragCounter++;
-        if (!dropZone.classList.contains('dimmed')) dropZone.classList.add('drag-over');
+        if (inSuccessState()) {
+          stateSuccess.classList.add('drag-over');
+        } else if (!dropZone.classList.contains('dimmed')) {
+          dropZone.classList.add('drag-over');
+        }
       });
 
       document.body.addEventListener('dragover', (e) => e.preventDefault());
@@ -857,6 +864,7 @@
         if (--dragCounter <= 0) {
           dragCounter = 0;
           dropZone.classList.remove('drag-over');
+          stateSuccess.classList.remove('drag-over');
         }
       });
 
@@ -864,9 +872,15 @@
         e.preventDefault();
         dragCounter = 0;
         dropZone.classList.remove('drag-over');
-        if (dropZone.classList.contains('dimmed')) return;
+        stateSuccess.classList.remove('drag-over');
         const files = Array.from(e.dataTransfer.files);
-        if (files.length) addFiles(files);
+        if (!files.length) return;
+        if (inSuccessState()) {
+          clearFiles();
+          textInput.value = '';
+          showIdle();
+        }
+        if (!dropZone.classList.contains('dimmed')) addFiles(files);
       });
 
       // Paste files
