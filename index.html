@@ -921,7 +921,7 @@
             showSending();
 
             const { file } = snapshot[i];
-            const fileType = file.type.startsWith('image/') ? 'image' : 'file';
+            const fileType = (mode !== 'file' && file.type.startsWith('image/')) ? 'image' : 'file';
             const result = await sendPayload(fileType, file, null, token);
             if (!result) return; // error already shown
             links.push(buildTgLink(result.chatId, result.messageId));
