@@ -463,6 +463,69 @@
     #retry-btn:hover { border-color: #e05252; color: #e05252; }
 
     #file-input { display: none; }
+
+    /* ── Char counter ─────────────────────────────────────────────────── */
+    #char-counter {
+      font-size: 0.74rem;
+      text-align: right;
+      min-height: 1em;
+      margin-top: -6px;
+      margin-bottom: 4px;
+      transition: color 0.15s;
+    }
+
+    /* ── Send button tooltip ──────────────────────────────────────────── */
+    #send-btn { position: relative; }
+    #send-btn::after {
+      content: '⌘↵';
+      position: absolute;
+      right: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 0.72rem;
+      color: rgba(0,0,0,0.35);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    #send-btn:hover:not(:disabled)::after { opacity: 1; }
+
+    /* ── Silent badge ─────────────────────────────────────────────────── */
+    #silent-badge {
+      display: none;
+      font-size: 0.72rem;
+      color: #555;
+      text-align: center;
+      margin-top: 5px;
+    }
+    #silent-badge.visible { display: block; }
+
+    /* ── Context menu ─────────────────────────────────────────────────── */
+    #send-ctx-menu {
+      position: fixed;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 4px;
+      z-index: 200;
+      min-width: 155px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    }
+    #send-ctx-menu[hidden] { display: none; }
+    #send-ctx-menu button {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #aaa;
+      font-size: 0.84rem;
+      padding: 8px 12px;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #send-ctx-menu button:hover { background: #252525; color: #fff; }
+    #send-ctx-menu button.active { color: #4a9eff; }
   </style>
 </head>
 <body>
@@ -503,10 +566,10 @@
     <div id="input-form">
       <!-- Mode tabs -->
       <div class="mode-tabs" id="mode-tabs" role="tablist">
-        <button class="mode-tab active" data-mode="auto" type="button" role="tab" aria-selected="true">Auto</button>
-        <button class="mode-tab" data-mode="file" type="button" role="tab">File</button>
-        <button class="mode-tab" data-mode="text" type="button" role="tab">Text</button>
-        <button class="mode-tab" data-mode="link" type="button" role="tab">Link</button>
+        <button class="mode-tab active" data-mode="auto" type="button" role="tab" aria-selected="true" tabindex="0">Auto</button>
+        <button class="mode-tab" data-mode="file" type="button" role="tab" tabindex="-1">File</button>
+        <button class="mode-tab" data-mode="text" type="button" role="tab" tabindex="-1">Text</button>
+        <button class="mode-tab" data-mode="link" type="button" role="tab" tabindex="-1">Link</button>
       </div>
 
       <!-- Drop zone -->
@@ -537,13 +600,17 @@
       <div id="drop-warning"></div>
 
       <!-- Text input -->
-      <textarea id="text-input" placeholder="Paste a link or type a note…" rows="3" spellcheck="true"></textarea>
+      <textarea id="text-input" placeholder="Paste a link or type a note…" rows="3" spellcheck="true" maxlength="4096"></textarea>
+
+      <!-- Char counter -->
+      <div id="char-counter"></div>
 
       <!-- Type badge -->
       <div id="type-badge" aria-live="polite"></div>
 
       <!-- Send button -->
       <button id="send-btn" type="button" disabled>Send</button>
+      <div id="silent-badge">🔕 silent mode on</div>
     </div>
 
     <!-- Sending state -->
@@ -577,6 +644,11 @@
 
   <input type="file" id="file-input" multiple>
 
+  <!-- Silent send context menu -->
+  <div id="send-ctx-menu" hidden>
+    <button id="silent-toggle" type="button">🔕 Send silently</button>
+  </div>
+
   <script>
     (function () {
       'use strict';
@@ -607,6 +679,10 @@
       const stateError   = document.getElementById('state-error');
       const errorMsgEl   = document.getElementById('error-msg');
       const retryBtn     = document.getElementById('retry-btn');
+      const charCounter  = document.getElementById('char-counter');
+      const silentBadge  = document.getElementById('silent-badge');
+      const sendCtxMenu  = document.getElementById('send-ctx-menu');
+      const silentToggle = document.getElementById('silent-toggle');
 
       // ── App state ─────────────────────────────────────────────────────────
       let mode = 'auto';
@@ -614,6 +690,7 @@
       let stagedFiles = [];
       let dragCounter = 0;
       let warnTimer = null;
+      let sendSilent = false;
 
       // ── Auth ──────────────────────────────────────────────────────────────
       function getToken() {
@@ -682,6 +759,35 @@
       pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitPin(); });
       lockBtn.addEventListener('click', () => { clearToken(); showPinOverlay(); });
 
+      // ── Silent send context menu ───────────────────────────────────────────
+      function setSilent(val) {
+        sendSilent = val;
+        silentToggle.classList.toggle('active', sendSilent);
+        silentBadge.classList.toggle('visible', sendSilent);
+      }
+
+      sendBtn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        sendCtxMenu.hidden = false;
+        sendCtxMenu.style.left = `${Math.min(e.clientX, window.innerWidth - 170)}px`;
+        sendCtxMenu.style.top = `${e.clientY - sendCtxMenu.offsetHeight - 4}px`;
+        // Re-position after the menu is visible so we know its height
+        requestAnimationFrame(() => {
+          sendCtxMenu.style.top = `${e.clientY - sendCtxMenu.offsetHeight - 4}px`;
+        });
+      });
+
+      silentToggle.addEventListener('click', () => {
+        setSilent(!sendSilent);
+        sendCtxMenu.hidden = true;
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!sendCtxMenu.hidden && !sendCtxMenu.contains(e.target)) {
+          sendCtxMenu.hidden = true;
+        }
+      });
+
       // ── Mode tabs ─────────────────────────────────────────────────────────
       modeTabs.addEventListener('click', (e) => {
         const tab = e.target.closest('.mode-tab');
@@ -689,20 +795,33 @@
         modeTabs.querySelectorAll('.mode-tab').forEach(t => {
           t.classList.remove('active');
           t.setAttribute('aria-selected', 'false');
+          t.setAttribute('tabindex', '-1');
         });
         tab.classList.add('active');
         tab.setAttribute('aria-selected', 'true');
+        tab.setAttribute('tabindex', '0');
         mode = tab.dataset.mode;
 
         if (mode === 'text' || mode === 'link') clearFiles();
         dropZone.classList.toggle('dimmed', mode === 'text' || mode === 'link');
-        textInput.classList.toggle('hidden', mode === 'file');
-
-        textInput.placeholder = mode === 'link' ? 'Paste a URL…'
-          : mode === 'text' ? 'Type a note…'
-          : 'Paste a link or type a note…';
 
         refreshBadgeAndBtn();
+      });
+
+      // Arrow-key navigation within the tablist (ARIA roving tabindex)
+      modeTabs.addEventListener('keydown', (e) => {
+        const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
+        const cur = tabs.findIndex(t => t === document.activeElement);
+        if (cur === -1) return;
+        let next = cur;
+        if (e.key === 'ArrowRight') next = (cur + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft') next = (cur - 1 + tabs.length) % tabs.length;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = tabs.length - 1;
+        else return;
+        e.preventDefault();
+        tabs[next].click();
+        tabs[next].focus();
       });
 
       // ── Type detection ────────────────────────────────────────────────────
@@ -721,6 +840,14 @@
 
       const TYPE_LABELS = { files: '📎 Files', link: '🔗 Link', text: '📝 Text note' };
 
+      function updatePlaceholder() {
+        const hasFiles = stagedFiles.length > 0;
+        if (mode === 'link') textInput.placeholder = 'Paste a URL…';
+        else if (mode === 'text') textInput.placeholder = 'Type a note…';
+        else if (mode === 'file' || (mode === 'auto' && hasFiles)) textInput.placeholder = 'Add a caption… (optional)';
+        else textInput.placeholder = 'Paste a link or type a note…';
+      }
+
       function refreshBadgeAndBtn() {
         const type = detectType();
 
@@ -736,9 +863,23 @@
         }
 
         sendBtn.disabled = !type;
+        updatePlaceholder();
       }
 
-      textInput.addEventListener('input', refreshBadgeAndBtn);
+      function updateCharCounter() {
+        const len = textInput.value.length;
+        if (len >= 3900) {
+          charCounter.textContent = `${len}/4096`;
+          charCounter.style.color = len >= 4000 ? '#e05252' : '#666';
+        } else {
+          charCounter.textContent = '';
+        }
+      }
+
+      textInput.addEventListener('input', () => {
+        refreshBadgeAndBtn();
+        updateCharCounter();
+      });
 
       // ── File management ───────────────────────────────────────────────────
       function addFiles(fileList) {
@@ -893,12 +1034,12 @@
         }
         // Text paste — only intercept when textarea is not already focused
         if (document.activeElement === textInput) return;
-        if (mode === 'file') return;
         const text = e.clipboardData.getData('text');
         if (!text) return;
         e.preventDefault();
         textInput.value = text;
         textInput.focus();
+        updateCharCounter();
         refreshBadgeAndBtn();
       });
 
@@ -913,6 +1054,8 @@
       // ── Send ──────────────────────────────────────────────────────────────
       sendBtn.addEventListener('click', doSend);
 
+      const ALBUM_MAX = 10;
+
       async function doSend() {
         const type = detectType();
         if (!type) return;
@@ -920,41 +1063,82 @@
         const token = getToken();
         if (!token) { showPinOverlay(); return; }
 
+        const caption = textInput.value.trim();
+
         if (type === 'text' || type === 'link') {
           setSendingLabel('Sending…');
           showSending();
-          const result = await sendPayload(type, null, textInput.value.trim(), token);
+          const result = await sendPayload(type, null, caption, token);
           if (!result) return;
           showSuccess([buildTgLink(result.chatId, result.messageId)], 1);
         } else {
-          // files — send sequentially
           const snapshot = [...stagedFiles];
           const links = [];
+          const allImages = snapshot.every(x => x.previewUrl);
 
-          for (let i = 0; i < snapshot.length; i++) {
-            setSendingLabel(snapshot.length > 1
-              ? `Sending ${i + 1} of ${snapshot.length}…`
-              : 'Sending…');
-            showSending();
-
-            const { file } = snapshot[i];
-            const fileType = (mode !== 'file' && file.type.startsWith('image/')) ? 'image' : 'file';
-            const result = await sendPayload(fileType, file, null, token);
-            if (!result) return; // error already shown
-            links.push(buildTgLink(result.chatId, result.messageId));
+          if (allImages && snapshot.length > 1) {
+            // Send as album(s)
+            const totalBatches = Math.ceil(snapshot.length / ALBUM_MAX);
+            for (let b = 0; b < totalBatches; b++) {
+              const batch = snapshot.slice(b * ALBUM_MAX, (b + 1) * ALBUM_MAX);
+              setSendingLabel(totalBatches > 1
+                ? `Sending album ${b + 1} of ${totalBatches}…`
+                : 'Sending album…');
+              showSending();
+              const result = await sendAlbum(batch, caption, token);
+              if (!result) return;
+              links.push(buildTgLink(result.chatId, result.messageId));
+            }
+          } else {
+            // Send files individually
+            for (let i = 0; i < snapshot.length; i++) {
+              setSendingLabel(snapshot.length > 1
+                ? `Sending ${i + 1} of ${snapshot.length}…`
+                : 'Sending…');
+              showSending();
+              const { file } = snapshot[i];
+              const fileType = (mode !== 'file' && file.type.startsWith('image/')) ? 'image' : 'file';
+              const result = await sendPayload(fileType, file, null, token, caption);
+              if (!result) return;
+              links.push(buildTgLink(result.chatId, result.messageId));
+            }
           }
 
           showSuccess(links, snapshot.length);
         }
       }
 
-      async function sendPayload(type, file, content, token) {
+      async function sendAlbum(files, caption, token) {
+        try {
+          const fd = new FormData();
+          fd.append('type', 'album');
+          files.forEach((item, i) => fd.append(`file${i}`, item.file));
+          if (caption) fd.append('caption', caption);
+          if (sendSilent) fd.append('silent', 'true');
+          const res = await fetch('/api/send', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: fd,
+          });
+          if (res.status === 401) { clearToken(); showPinOverlay(); return null; }
+          const data = await res.json();
+          if (!res.ok) { showError(data.error || 'Send failed (' + res.status + ')'); return null; }
+          return data;
+        } catch {
+          showError('Network error — check your connection.');
+          return null;
+        }
+      }
+
+      async function sendPayload(type, file, content, token, caption = '') {
         try {
           let res;
           if (file) {
             const fd = new FormData();
             fd.append('type', type);
             fd.append('file', file);
+            if (caption) fd.append('caption', caption);
+            if (sendSilent) fd.append('silent', 'true');
             res = await fetch('/api/send', {
               method: 'POST',
               headers: { 'Authorization': 'Bearer ' + token },
@@ -967,7 +1151,7 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
               },
-              body: JSON.stringify({ type, content }),
+              body: JSON.stringify({ type, content, silent: sendSilent }),
             });
           }
 
@@ -1037,6 +1221,7 @@
       sendAnother.addEventListener('click', () => {
         clearFiles();
         textInput.value = '';
+        charCounter.textContent = '';
         refreshBadgeAndBtn();
         showIdle();
       });

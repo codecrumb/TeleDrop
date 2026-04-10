@@ -53,10 +53,10 @@ export async function onRequestPost(context) {
   }
 
   const contentType = request.headers.get('Content-Type') || '';
-  let type, content, file;
+  let type, content, file, caption = '', silent = false, formData;
+  let isAlbum = false;
 
   if (contentType.includes('multipart/form-data')) {
-    let formData;
     try {
       formData = await request.formData();
     } catch {
@@ -64,6 +64,8 @@ export async function onRequestPost(context) {
     }
     type = formData.get('type');
     file = formData.get('file');
+    caption = formData.get('caption') || '';
+    silent = formData.get('silent') === 'true';
   } else {
     let body;
     try {
@@ -73,6 +75,8 @@ export async function onRequestPost(context) {
     }
     type = body.type;
     content = body.content;
+    caption = body.caption || '';
+    silent = body.silent === true;
   }
 
   if (!type) return json({ error: 'Missing type field' }, 400);
@@ -86,17 +90,21 @@ export async function onRequestPost(context) {
   let tgRes;
 
   if (type === 'image' && file) {
+    const cap = [caption.trim(), spoiler.trim()].filter(Boolean).join('\n');
     const fd = new FormData();
     fd.append('chat_id', env.CHAT_ID);
     fd.append('photo', file);
-    if (spoiler) { fd.append('caption', spoiler.trim()); fd.append('parse_mode', 'HTML'); }
+    if (silent) fd.append('disable_notification', 'true');
+    if (cap) { fd.append('caption', cap); fd.append('parse_mode', 'HTML'); }
     tgRes = await fetch(`${apiBase}/sendPhoto`, { method: 'POST', body: fd });
 
   } else if (type === 'file' && file) {
+    const cap = [caption.trim(), spoiler.trim()].filter(Boolean).join('\n');
     const fd = new FormData();
     fd.append('chat_id', env.CHAT_ID);
     fd.append('document', file);
-    if (spoiler) { fd.append('caption', spoiler.trim()); fd.append('parse_mode', 'HTML'); }
+    if (silent) fd.append('disable_notification', 'true');
+    if (cap) { fd.append('caption', cap); fd.append('parse_mode', 'HTML'); }
     tgRes = await fetch(`${apiBase}/sendDocument`, { method: 'POST', body: fd });
 
   } else if (type === 'text' || type === 'link') {
@@ -106,7 +114,35 @@ export async function onRequestPost(context) {
     fd.append('chat_id', env.CHAT_ID);
     fd.append('text', `${prefix} ${content.trim()}${spoiler}`);
     fd.append('parse_mode', 'HTML');
+    if (silent) fd.append('disable_notification', 'true');
     tgRes = await fetch(`${apiBase}/sendMessage`, { method: 'POST', body: fd });
+
+  } else if (type === 'album') {
+    isAlbum = true;
+    const mediaItems = [];
+    const fd = new FormData();
+    fd.append('chat_id', env.CHAT_ID);
+    if (silent) fd.append('disable_notification', 'true');
+
+    let i = 0;
+    while (true) {
+      const f = formData.get(`file${i}`);
+      if (!f) break;
+      const attachKey = `file${i}`;
+      fd.append(attachKey, f);
+      const mediaObj = { type: 'photo', media: `attach://${attachKey}` };
+      if (i === 0) {
+        const cap = [caption.trim(), spoiler.trim()].filter(Boolean).join('\n');
+        if (cap) { mediaObj.caption = cap; mediaObj.parse_mode = 'HTML'; }
+      }
+      mediaItems.push(mediaObj);
+      i++;
+    }
+
+    if (mediaItems.length === 0) return json({ error: 'No files provided for album' }, 400);
+
+    fd.append('media', JSON.stringify(mediaItems));
+    tgRes = await fetch(`${apiBase}/sendMediaGroup`, { method: 'POST', body: fd });
 
   } else {
     return json({ error: `Invalid send type: ${type}` }, 400);
@@ -123,5 +159,6 @@ export async function onRequestPost(context) {
     return json({ error: tgData.description || 'Telegram API error' }, 502);
   }
 
-  return json({ ok: true, messageId: tgData.result.message_id, chatId: env.CHAT_ID });
+  const msgId = isAlbum ? tgData.result[0].message_id : tgData.result.message_id;
+  return json({ ok: true, messageId: msgId, chatId: env.CHAT_ID });
 }
