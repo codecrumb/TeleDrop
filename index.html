@@ -1051,6 +1051,14 @@
         }
       });
 
+      // Cmd/Ctrl+O to open file picker
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'o' && (e.metaKey || e.ctrlKey) && !app.hidden) {
+          e.preventDefault();
+          if (!dropZone.classList.contains('dimmed')) fileInput.click();
+        }
+      });
+
       // ── Send ──────────────────────────────────────────────────────────────
       sendBtn.addEventListener('click', doSend);
 
