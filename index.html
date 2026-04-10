@@ -881,14 +881,33 @@
         if (!dropZone.classList.contains('dimmed')) addFiles(files);
       });
 
-      // Paste files
+      // Paste files or text/links anywhere on the page
       document.addEventListener('paste', (e) => {
         if (app.hidden) return;
-        const items = Array.from(e.clipboardData.items).filter(i => i.kind === 'file');
-        if (!items.length) return;
+        const fileItems = Array.from(e.clipboardData.items).filter(i => i.kind === 'file');
+        if (fileItems.length) {
+          e.preventDefault();
+          const files = fileItems.map(i => i.getAsFile()).filter(Boolean);
+          if (files.length) addFiles(files);
+          return;
+        }
+        // Text paste — only intercept when textarea is not already focused
+        if (document.activeElement === textInput) return;
+        if (mode === 'file') return;
+        const text = e.clipboardData.getData('text');
+        if (!text) return;
         e.preventDefault();
-        const files = items.map(i => i.getAsFile()).filter(Boolean);
-        if (files.length) addFiles(files);
+        textInput.value = text;
+        textInput.focus();
+        refreshBadgeAndBtn();
+      });
+
+      // Cmd/Ctrl+Enter to send from the textarea
+      textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          if (!sendBtn.disabled) doSend();
+        }
       });
 
       // ── Send ──────────────────────────────────────────────────────────────
