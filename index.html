@@ -1057,6 +1057,18 @@
           e.preventDefault();
           if (!dropZone.classList.contains('dimmed')) fileInput.click();
         }
+
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !app.hidden) {
+          const tag = document.activeElement?.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+          e.preventDefault();
+          const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
+          const cur = tabs.findIndex(t => t.classList.contains('active'));
+          const next = e.key === 'ArrowRight'
+            ? (cur + 1) % tabs.length
+            : (cur - 1 + tabs.length) % tabs.length;
+          tabs[next].click();
+        }
       });
 
       // ── Send ──────────────────────────────────────────────────────────────
