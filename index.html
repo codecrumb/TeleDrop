@@ -712,26 +712,6 @@
         document.cookie = 'teledrop_auth=; Path=/; Max-Age=0; SameSite=Strict';
       }
 
-      function showPinOverlay() {
-        pinOverlay.classList.remove('hidden');
-        app.hidden = true;
-        pinInput.value = '';
-        pinError.textContent = '';
-        pinInput.classList.remove('shake');
-        failedPinAttempts = 0;
-        pinSubmit.disabled = false;
-        resetTurnstile();
-        setTimeout(() => pinInput.focus(), 50);
-      }
-
-      function showApp() {
-        pinOverlay.classList.add('hidden');
-        app.hidden = false;
-      }
-
-      // Init
-      getToken() ? showApp() : showPinOverlay();
-
       // ── Turnstile ─────────────────────────────────────────────────────────
       const TURNSTILE_THRESHOLD = 3;
       let turnstileSiteKey = null; // loaded from /api/auth; null = disabled
@@ -767,6 +747,26 @@
         turnstileContainer.classList.remove('visible');
         turnstileToken = null;
       }
+
+      function showPinOverlay() {
+        pinOverlay.classList.remove('hidden');
+        app.hidden = true;
+        pinInput.value = '';
+        pinError.textContent = '';
+        pinInput.classList.remove('shake');
+        failedPinAttempts = 0;
+        pinSubmit.disabled = false;
+        resetTurnstile();
+        setTimeout(() => pinInput.focus(), 50);
+      }
+
+      function showApp() {
+        pinOverlay.classList.add('hidden');
+        app.hidden = false;
+      }
+
+      // Init
+      getToken() ? showApp() : showPinOverlay();
 
       // ── PIN flow ──────────────────────────────────────────────────────────
       async function submitPin() {
