@@ -116,6 +116,9 @@
 
     #pin-error { font-size: 0.8rem; color: #e05252; min-height: 1em; text-align: center; }
 
+    #turnstile-widget { display: none; align-self: center; }
+    #turnstile-widget.visible { display: block; }
+
     /* ── Main App ─────────────────────────────────────────────────────── */
     #app {
       width: 100%;
@@ -527,6 +530,7 @@
     #send-ctx-menu button:hover { background: #252525; color: #fff; }
     #send-ctx-menu button.active { color: #4a9eff; }
   </style>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
 
@@ -545,6 +549,7 @@
         <span>Remember me for 30 days</span>
       </label>
       <button id="pin-submit" type="button">Unlock</button>
+      <div id="turnstile-widget"></div>
       <div id="pin-error" role="alert"></div>
     </div>
   </div>
@@ -713,6 +718,9 @@
         pinInput.value = '';
         pinError.textContent = '';
         pinInput.classList.remove('shake');
+        failedPinAttempts = 0;
+        pinSubmit.disabled = false;
+        resetTurnstile();
         setTimeout(() => pinInput.focus(), 50);
       }
 
@@ -724,26 +732,84 @@
       // Init
       getToken() ? showApp() : showPinOverlay();
 
+      // ── Turnstile ─────────────────────────────────────────────────────────
+      const TURNSTILE_THRESHOLD = 3;
+      let turnstileSiteKey = null; // loaded from /api/auth; null = disabled
+      let failedPinAttempts = 0;
+      let turnstileToken = null;
+      let turnstileWidgetId = null;
+      const turnstileContainer = document.getElementById('turnstile-widget');
+
+      // Fetch Turnstile site key from server (null if not configured → feature disabled)
+      fetch('/api/auth').then(r => r.json()).then(d => { turnstileSiteKey = d.turnstileSiteKey || null; }).catch(() => {});
+
+      function showTurnstile() {
+        if (!turnstileSiteKey) return; // Turnstile not configured
+        turnstileContainer.classList.add('visible');
+        turnstileWidgetId = turnstile.render(turnstileContainer, {
+          sitekey: turnstileSiteKey,
+          theme: 'dark',
+          appearance: 'always',
+          callback: (token) => {
+            turnstileToken = token;
+            if (pinInput.value) pinSubmit.disabled = false;
+          },
+          'expired-callback': () => { turnstileToken = null; pinSubmit.disabled = true; },
+          'error-callback':   () => { turnstileToken = null; },
+        });
+      }
+
+      function resetTurnstile() {
+        if (turnstileWidgetId !== null) {
+          turnstile.remove(turnstileWidgetId);
+          turnstileWidgetId = null;
+        }
+        turnstileContainer.classList.remove('visible');
+        turnstileToken = null;
+      }
+
       // ── PIN flow ──────────────────────────────────────────────────────────
       async function submitPin() {
         const pin = pinInput.value;
         if (!pin) return;
+
+        if (turnstileSiteKey && failedPinAttempts >= TURNSTILE_THRESHOLD && !turnstileToken) {
+          pinError.textContent = 'Please complete the security check first';
+          return;
+        }
+
         pinSubmit.disabled = true;
         pinError.textContent = '';
 
+        let wrongPin = false;
         try {
+          const body = { pin, remember: rememberMe.checked };
+          if (turnstileToken) body.cfTurnstileToken = turnstileToken;
+
           const res = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin, remember: rememberMe.checked }),
+            body: JSON.stringify(body),
           });
           const data = await res.json();
           if (!res.ok) {
+            wrongPin = true;
+            failedPinAttempts++;
             pinError.textContent = data.error || 'Incorrect PIN';
             pinInput.classList.remove('shake');
             void pinInput.offsetWidth;
             pinInput.classList.add('shake');
             pinInput.select();
+
+            if (turnstileSiteKey && failedPinAttempts >= TURNSTILE_THRESHOLD) {
+              if (turnstileWidgetId === null) {
+                showTurnstile();
+              } else {
+                turnstile.reset(turnstileWidgetId);
+                turnstileToken = null;
+              }
+            }
+            // Button stays disabled — re-enabled on input change (or after turnstile solved)
           } else {
             saveToken(data.token);
             showApp();
@@ -751,12 +817,21 @@
         } catch {
           pinError.textContent = 'Network error — try again';
         } finally {
-          pinSubmit.disabled = false;
+          if (!wrongPin) pinSubmit.disabled = false;
         }
       }
 
       pinSubmit.addEventListener('click', submitPin);
       pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitPin(); });
+      pinInput.addEventListener('input', () => {
+        pinError.textContent = '';
+        pinInput.classList.remove('shake');
+        if (pinSubmit.disabled) {
+          if (!turnstileSiteKey || failedPinAttempts < TURNSTILE_THRESHOLD || turnstileToken) {
+            pinSubmit.disabled = false;
+          }
+        }
+      });
       lockBtn.addEventListener('click', () => { clearToken(); showPinOverlay(); });
 
       // ── Silent send context menu ───────────────────────────────────────────

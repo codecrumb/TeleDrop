@@ -1,3 +1,13 @@
+async function verifyTurnstile(token, secretKey, ip) {
+  const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secret: secretKey, response: token, remoteip: ip }),
+  });
+  const data = await res.json();
+  return data.success === true;
+}
+
 async function computeToken(env) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -13,6 +23,10 @@ function json(data, status, headers = {}) {
     status,
     headers: { 'Content-Type': 'application/json', ...headers },
   });
+}
+
+export async function onRequestGet(context) {
+  return json({ turnstileSiteKey: context.env.TURNSTILE_SITE_KEY || null }, 200);
 }
 
 export async function onRequestPost(context) {
@@ -32,7 +46,16 @@ export async function onRequestPost(context) {
     return json({ error: 'Invalid JSON body' }, 400);
   }
 
-  const { pin, remember } = body;
+  const { pin, remember, cfTurnstileToken } = body;
+
+  // Validate Turnstile challenge when the client sends one
+  if (cfTurnstileToken && env.TURNSTILE_SECRET_KEY) {
+    const ip = request.headers.get('cf-connecting-ip') || '';
+    const valid = await verifyTurnstile(cfTurnstileToken, env.TURNSTILE_SECRET_KEY, ip);
+    if (!valid) {
+      return json({ error: 'Security check failed — please try again' }, 403);
+    }
+  }
 
   // Always compute token (avoids trivial timing oracle on missing PIN field)
   const token = await computeToken(env);
