@@ -39,9 +39,10 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 
 ### 2. Deploy to Cloudflare Pages
 
-1. Fork or clone this repo
-2. Connect it to [Cloudflare Pages](https://pages.cloudflare.com/)
-3. Set these environment variables in the CF Pages dashboard:
+> For a detailed walkthrough with screenshots, see the [Cloudflare Pages deployment guide](https://gist.github.com/codecrumb/8df2e30628bf9c089779598cd218b574).
+
+1. Fork this repo and connect it to Cloudflare Pages (no build command needed — leave it blank)
+2. Set these environment variables in the CF Pages dashboard:
 
 | Variable | Required | Description |
 |---|---|---|
