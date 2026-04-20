@@ -976,15 +976,15 @@
       });
 
       // ── File management ───────────────────────────────────────────────────
-      function addFiles(fileList) {
+      function addFiles(fileList, asFolder) {
         const oversized = [];
         for (const file of fileList) {
           if (file.size > 100 * 1024 * 1024) {
             oversized.push(file.name);
             continue;
           }
-          const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
-          stagedFiles.push({ file, previewUrl });
+          const previewUrl = (!asFolder && file.type.startsWith('image/')) ? URL.createObjectURL(file) : null;
+          stagedFiles.push({ file, previewUrl, isFolder: !!asFolder });
         }
         if (oversized.length) {
           const names = oversized.length === 1
@@ -1033,7 +1033,9 @@
             icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('fill', 'none');
             icon.setAttribute('stroke', 'currentColor'); icon.setAttribute('stroke-width', '1.8');
             icon.setAttribute('stroke-linecap', 'round'); icon.setAttribute('stroke-linejoin', 'round');
-            icon.innerHTML = '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline>';
+            icon.innerHTML = item.isFolder
+              ? '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>'
+              : '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline>';
             const name = document.createElement('span');
             name.className = 'chip-name';
             name.textContent = item.file.name;
@@ -1389,10 +1391,10 @@
             if (totalSize <= ZIP_SIZE_LIMIT) {
               dropWarning.textContent = 'Zipping ' + entry.name + '\u2026';
               const zipFile = await makeZip(collected, entry.name);
-              filesToStage.push(zipFile);
+              addFiles([zipFile], true);
             } else {
               // Too large to zip — stage files individually
-              filesToStage.push.apply(filesToStage, collected.map(function (e) { return e.file; }));
+              addFiles(collected.map(function (e) { return e.file; }));
             }
           } else {
             const file = await new Promise(function (res, rej) { entry.file(res, rej); });
@@ -1405,22 +1407,19 @@
       }
 
       async function handleFolderGroupsStaging(byFolder) {
-        const filesToStage = [];
-
         for (const folderName of Object.keys(byFolder)) {
           const entries = byFolder[folderName];
           const totalSize = entries.reduce(function (s, e) { return s + e.file.size; }, 0);
           if (totalSize <= ZIP_SIZE_LIMIT) {
             dropWarning.textContent = 'Zipping ' + folderName + '\u2026';
             const zipFile = await makeZip(entries, folderName);
-            filesToStage.push(zipFile);
+            addFiles([zipFile], true);
           } else {
-            filesToStage.push.apply(filesToStage, entries.map(function (e) { return e.file; }));
+            addFiles(entries.map(function (e) { return e.file; }));
           }
         }
 
         dropWarning.textContent = '';
-        if (filesToStage.length) addFiles(filesToStage);
       }
 
       async function collectEntries(entry, prefix, result) {
