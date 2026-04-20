@@ -469,7 +469,18 @@
 
     #retry-btn:hover { border-color: #e05252; color: #e05252; }
 
-    #file-input { display: none; }
+    #file-input, #folder-input { display: none; }
+
+    .inline-link {
+      background: none;
+      border: none;
+      color: inherit;
+      font: inherit;
+      font-size: 0.88rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
 
     /* ── Char counter ─────────────────────────────────────────────────── */
     #char-counter {
@@ -592,8 +603,8 @@
             <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
           </svg>
           <div class="dz-label">
-            <strong>Drop files here</strong>
-            or click to browse
+            <strong>Drop files or folders here</strong>
+            click to browse &nbsp;·&nbsp; <button id="browse-folder-btn" type="button" class="inline-link">select folder</button>
           </div>
         </div>
 
@@ -652,6 +663,7 @@
   </div>
 
   <input type="file" id="file-input" multiple>
+  <input type="file" id="folder-input" webkitdirectory>
 
   <!-- Silent send context menu -->
   <div id="send-ctx-menu" hidden>
@@ -673,6 +685,7 @@
       const modeTabs     = document.getElementById('mode-tabs');
       const dropZone     = document.getElementById('drop-zone');
       const fileInput    = document.getElementById('file-input');
+      const folderInput  = document.getElementById('folder-input');
       const fileChips    = document.getElementById('file-chips');
       const dropWarning  = document.getElementById('drop-warning');
       const textInput    = document.getElementById('text-input');
@@ -700,6 +713,8 @@
       let dragCounter = 0;
       let warnTimer = null;
       let sendSilent = false;
+
+      const ZIP_SIZE_LIMIT = 45 * 1024 * 1024; // 45 MB — Telegram bot API limit is 50 MB
 
       // ── Auth ──────────────────────────────────────────────────────────────
       function getToken() {
@@ -1064,6 +1079,26 @@
         fileInput.value = '';
       });
 
+      // ── Folder picker ─────────────────────────────────────────────────────
+      document.getElementById('browse-folder-btn').addEventListener('click', (e) => {
+        e.stopPropagation(); // don't trigger the dropzone click
+        folderInput.click();
+      });
+
+      folderInput.addEventListener('change', () => {
+        const files = Array.from(folderInput.files);
+        folderInput.value = '';
+        if (!files.length) return;
+        // webkitRelativePath is "FolderName/subdir/file.ext" — group by top-level dir
+        const byFolder = {};
+        for (const file of files) {
+          const topFolder = file.webkitRelativePath.split('/')[0];
+          if (!byFolder[topFolder]) byFolder[topFolder] = [];
+          byFolder[topFolder].push({ path: file.webkitRelativePath, file });
+        }
+        handleFolderGroupsStaging(byFolder);
+      });
+
       function inSuccessState() { return stateSuccess.style.display === 'flex'; }
 
       document.body.addEventListener('dragenter', (e) => {
@@ -1091,14 +1126,25 @@
         dragCounter = 0;
         dropZone.classList.remove('drag-over');
         stateSuccess.classList.remove('drag-over');
-        const files = Array.from(e.dataTransfer.files);
-        if (!files.length) return;
-        if (inSuccessState()) {
-          clearFiles();
-          textInput.value = '';
-          showIdle();
+
+        // webkitGetAsEntry() must be called synchronously inside the event handler
+        const items = e.dataTransfer.items ? Array.from(e.dataTransfer.items) : null;
+        let entries = null;
+        if (items) entries = items.map(i => i.webkitGetAsEntry()).filter(Boolean);
+
+        const hasFolder = entries && entries.some(en => en.isDirectory);
+
+        if (!hasFolder) {
+          const files = Array.from(e.dataTransfer.files);
+          if (!files.length) return;
+          if (inSuccessState()) { clearFiles(); textInput.value = ''; showIdle(); }
+          if (!dropZone.classList.contains('dimmed')) addFiles(files);
+          return;
         }
-        if (!dropZone.classList.contains('dimmed')) addFiles(files);
+
+        if (dropZone.classList.contains('dimmed')) return;
+        if (inSuccessState()) { clearFiles(); textInput.value = ''; showIdle(); }
+        handleDroppedFolderEntries(entries);
       });
 
       // Paste files or text/links anywhere on the page
@@ -1326,6 +1372,100 @@
       });
 
       retryBtn.addEventListener('click', showIdle);
+
+      // ── Folder zip helpers ────────────────────────────────────────────────
+
+      async function handleDroppedFolderEntries(entries) {
+        const filesToStage = [];
+
+        for (const entry of entries) {
+          if (entry.isDirectory) {
+            dropWarning.textContent = 'Reading ' + entry.name + '\u2026';
+            const collected = [];
+            await collectEntries(entry, '', collected);
+            if (!collected.length) continue;
+
+            const totalSize = collected.reduce(function (s, e) { return s + e.file.size; }, 0);
+            if (totalSize <= ZIP_SIZE_LIMIT) {
+              dropWarning.textContent = 'Zipping ' + entry.name + '\u2026';
+              const zipFile = await makeZip(collected, entry.name);
+              filesToStage.push(zipFile);
+            } else {
+              // Too large to zip — stage files individually
+              filesToStage.push.apply(filesToStage, collected.map(function (e) { return e.file; }));
+            }
+          } else {
+            const file = await new Promise(function (res, rej) { entry.file(res, rej); });
+            filesToStage.push(file);
+          }
+        }
+
+        dropWarning.textContent = '';
+        if (filesToStage.length) addFiles(filesToStage);
+      }
+
+      async function handleFolderGroupsStaging(byFolder) {
+        const filesToStage = [];
+
+        for (const folderName of Object.keys(byFolder)) {
+          const entries = byFolder[folderName];
+          const totalSize = entries.reduce(function (s, e) { return s + e.file.size; }, 0);
+          if (totalSize <= ZIP_SIZE_LIMIT) {
+            dropWarning.textContent = 'Zipping ' + folderName + '\u2026';
+            const zipFile = await makeZip(entries, folderName);
+            filesToStage.push(zipFile);
+          } else {
+            filesToStage.push.apply(filesToStage, entries.map(function (e) { return e.file; }));
+          }
+        }
+
+        dropWarning.textContent = '';
+        if (filesToStage.length) addFiles(filesToStage);
+      }
+
+      async function collectEntries(entry, prefix, result) {
+        if (entry.isFile) {
+          const file = await new Promise(function (res, rej) { entry.file(res, rej); });
+          result.push({ path: prefix + entry.name, file: file });
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const children = await readAllDirEntries(reader);
+          for (const child of children) {
+            await collectEntries(child, prefix + entry.name + '/', result);
+          }
+        }
+      }
+
+      function readAllDirEntries(reader) {
+        return new Promise(function (resolve, reject) {
+          var all = [];
+          function batch() {
+            reader.readEntries(function (entries) {
+              if (!entries.length) return resolve(all);
+              all.push.apply(all, entries);
+              batch();
+            }, reject);
+          }
+          batch();
+        });
+      }
+
+      async function makeZip(entries, folderName) {
+        if (typeof JSZip === 'undefined') {
+          await new Promise(function (res, rej) {
+            var s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        var zip = new JSZip();
+        for (var i = 0; i < entries.length; i++) {
+          zip.file(entries[i].path, entries[i].file);
+        }
+        var blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        return new File([blob], folderName + '.zip', { type: 'application/zip' });
+      }
 
     })();
   </script>
