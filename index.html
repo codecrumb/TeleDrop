@@ -362,20 +362,55 @@
 
     /* ── Send button ──────────────────────────────────────────────────── */
     #send-btn {
+      position: relative;
       width: 100%;
-      background: #fff;
-      color: #000;
-      border: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #fff;
       border-radius: 12px;
-      font-size: 0.98rem;
-      font-weight: 600;
-      padding: 14px;
+      color: #000;
+      font-size: 0.88rem;
+      font-weight: 900;
+      background: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 14px 32px;
       cursor: pointer;
-      transition: background 0.15s, opacity 0.15s;
-      letter-spacing: -0.01em;
+      overflow: hidden;
+      transition: color 700ms ease-in-out;
     }
 
-    #send-btn:hover:not(:disabled) { background: #e8e8e8; }
+    #send-btn::before {
+      content: '';
+      position: absolute;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      background: #000;
+      z-index: 0;
+      left: -100%;
+      transition: left 700ms ease-in-out, transform 700ms ease-in-out;
+    }
+
+    #send-btn span, #send-btn svg { position: relative; z-index: 1; }
+
+    #send-btn svg {
+      fill: #000;
+      flex-shrink: 0;
+      transition: fill 700ms ease-in-out;
+    }
+
+    #send-btn:hover:not(:disabled) { color: #fff; }
+    #send-btn:hover:not(:disabled) svg { fill: #fff; }
+
+    #send-btn:hover:not(:disabled)::before {
+      left: 0;
+      transform: scale(1.5);
+    }
+
+    #send-btn:active:not(:disabled) { transform: scale(0.95); transition: transform 0s; }
     #send-btn:disabled { opacity: 0.35; cursor: default; }
 
     /* ── Status states ────────────────────────────────────────────────── */
@@ -492,19 +527,6 @@
       transition: color 0.15s;
     }
 
-    /* ── Send button tooltip ──────────────────────────────────────────── */
-    #send-btn { position: relative; }
-    #send-btn::after {
-      content: '⌘↵';
-      position: absolute;
-      right: 14px; top: 50%; transform: translateY(-50%);
-      font-size: 0.72rem;
-      color: rgba(0,0,0,0.35);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-    #send-btn:hover:not(:disabled)::after { opacity: 1; }
 
     /* ── Silent badge ─────────────────────────────────────────────────── */
     #silent-badge {
@@ -629,7 +651,12 @@
       <div id="type-badge" aria-live="polite"></div>
 
       <!-- Send button -->
-      <button id="send-btn" type="button" disabled>Send</button>
+      <button id="send-btn" type="button" disabled>
+        <span>Send</span>
+        <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 512 512" height="15" width="15" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="m476.59 227.05-.16-.07L49.35 49.84A23.56 23.56 0 0 0 27.14 52 24.65 24.65 0 0 0 16 72.59v113.29a24 24 0 0 0 19.52 23.57l232.93 43.07a4 4 0 0 1 0 7.86L35.53 303.45A24 24 0 0 0 16 327v113.31A23.57 23.57 0 0 0 26.59 460a23.94 23.94 0 0 0 13.22 4 24.55 24.55 0 0 0 9.52-1.93L476.4 285.94l.19-.09a32 32 0 0 0 0-58.8z"></path>
+        </svg>
+      </button>
       <div id="silent-badge">🔕 silent mode on</div>
     </div>
 
