@@ -628,6 +628,7 @@
     .kbd-sep { font-size: 0.62rem; color: #444; }
 
     .mac-only { display: none; }
+    .win-only { display: inline; }
     body.is-mac .mac-only { display: inline; }
     body.is-mac .win-only { display: none; }
   </style>
@@ -932,6 +933,7 @@
       }
 
       function showPinOverlay() {
+        closeShortcuts();
         pinOverlay.classList.remove('hidden');
         app.hidden = true;
         pinInput.value = '';
