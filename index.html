@@ -1335,24 +1335,77 @@
         refreshBadgeAndBtn();
       });
 
-      // Cmd/Ctrl+Enter to send from the textarea
-      textInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-          e.preventDefault();
-          if (!sendBtn.disabled) doSend();
-        }
-      });
-
-      // Cmd/Ctrl+O to open file picker
+      // ── Unified keyboard handler ──────────────────────────────────────────
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'o' && (e.metaKey || e.ctrlKey) && !app.hidden) {
+        // 1. PIN overlay visible → ignore everything
+        if (!pinOverlay.classList.contains('hidden')) return;
+
+        // 2. Modal open → close on dismiss keys, swallow all others
+        if (!shortcutsModal.hidden) {
+          if (e.key === 'Escape' || e.key === 'Enter' || e.key === '?' || e.key === '/') {
+            e.preventDefault();
+            closeShortcuts();
+          }
+          return;
+        }
+
+        // 3. Focused in pin-input → ignore
+        if (document.activeElement === pinInput) return;
+
+        // 4. Focused in text-input → only Cmd/Ctrl+Enter fires
+        if (document.activeElement === textInput) {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (!sendBtn.disabled) doSend();
+          }
+          return;
+        }
+
+        // 5. Idle focus → all shortcuts
+        const mod = e.metaKey || e.ctrlKey;
+
+        // Cmd/Ctrl+Esc → lock app
+        if (e.key === 'Escape' && mod) {
+          e.preventDefault();
+          clearToken();
+          showPinOverlay();
+          return;
+        }
+
+        // Esc → remove last staged file (no-op if none)
+        if (e.key === 'Escape') {
+          if (stagedFiles.length) {
+            e.preventDefault();
+            removeFileAt(stagedFiles.length - 1);
+          }
+          return;
+        }
+
+        // ? or / → open shortcuts modal
+        if (e.key === '?' || e.key === '/') {
+          e.preventDefault();
+          openShortcuts();
+          return;
+        }
+
+        // Cmd/Ctrl+O → open file picker
+        if (e.key === 'o' && mod) {
           e.preventDefault();
           if (!dropZone.classList.contains('dimmed')) fileInput.click();
+          return;
         }
 
-        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !app.hidden) {
-          const tag = document.activeElement?.tagName;
-          if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        // Alt+1–4 → jump to specific tab
+        if (e.altKey && ['1', '2', '3', '4'].includes(e.key)) {
+          e.preventDefault();
+          const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
+          const idx = parseInt(e.key, 10) - 1;
+          if (tabs[idx]) tabs[idx].click();
+          return;
+        }
+
+        // ←/→ → cycle mode tabs
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           e.preventDefault();
           const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
           const cur = tabs.findIndex(t => t.classList.contains('active'));
