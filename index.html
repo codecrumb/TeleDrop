@@ -566,6 +566,70 @@
     }
     #send-ctx-menu button:hover { background: #252525; color: #fff; }
     #send-ctx-menu button.active { color: #4a9eff; }
+
+    /* ── Shortcuts Modal ─────────────────────────────────────────────── */
+    #shortcuts-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(13,13,13,0.75);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    #shortcuts-modal[hidden] { display: none; }
+
+    #shortcuts-card {
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 20px 22px;
+      width: 280px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    .sc-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #555;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .sc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #1e1e1e;
+    }
+
+    .sc-row:last-child { border-bottom: none; }
+
+    .sc-desc { font-size: 0.8rem; color: #888; }
+
+    .sc-keys { display: flex; gap: 3px; align-items: center; }
+
+    .kbd {
+      background: #0f0f0f;
+      border: 1px solid #2e2e2e;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      color: #aaa;
+      padding: 2px 6px;
+      font-family: monospace;
+      line-height: 1.5;
+    }
+
+    .kbd-sep { font-size: 0.62rem; color: #444; }
+
+    .mac-only { display: none; }
+    body.is-mac .mac-only { display: inline; }
+    body.is-mac .win-only { display: none; }
   </style>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
