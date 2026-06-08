@@ -761,6 +761,65 @@
     <button id="silent-toggle" type="button">🔕 Send silently</button>
   </div>
 
+  <!-- Shortcuts modal -->
+  <div id="shortcuts-modal" hidden>
+    <div id="shortcuts-card">
+      <div class="sc-title">Keyboard Shortcuts</div>
+      <div class="sc-row">
+        <span class="sc-desc">Send</span>
+        <div class="sc-keys">
+          <span class="kbd mac-only">⌘</span><span class="kbd win-only">Ctrl</span>
+          <span class="kbd-sep">+</span>
+          <span class="kbd">↵</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">Open files</span>
+        <div class="sc-keys">
+          <span class="kbd mac-only">⌘</span><span class="kbd win-only">Ctrl</span>
+          <span class="kbd-sep">+</span>
+          <span class="kbd">O</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">Switch tab</span>
+        <div class="sc-keys">
+          <span class="kbd mac-only">⌥</span><span class="kbd win-only">Alt</span>
+          <span class="kbd-sep">+</span>
+          <span class="kbd">1–4</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">Cycle tabs</span>
+        <div class="sc-keys">
+          <span class="kbd">←</span>
+          <span class="kbd-sep">/</span>
+          <span class="kbd">→</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">Remove last file</span>
+        <div class="sc-keys">
+          <span class="kbd">Esc</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">Lock app</span>
+        <div class="sc-keys">
+          <span class="kbd mac-only">⌘</span><span class="kbd win-only">Ctrl</span>
+          <span class="kbd-sep">+</span>
+          <span class="kbd">Esc</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">This help</span>
+        <div class="sc-keys">
+          <span class="kbd">?</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function () {
       'use strict';
@@ -796,6 +855,7 @@
       const silentBadge  = document.getElementById('silent-badge');
       const sendCtxMenu  = document.getElementById('send-ctx-menu');
       const silentToggle = document.getElementById('silent-toggle');
+      const shortcutsModal  = document.getElementById('shortcuts-modal');
 
       // ── App state ─────────────────────────────────────────────────────────
       let mode = 'auto';
