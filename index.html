@@ -1342,7 +1342,7 @@
 
         // 2. Modal open → close on dismiss keys, swallow all others
         if (!shortcutsModal.hidden) {
-          if (e.key === 'Escape' || e.key === 'Enter' || e.key === '?' || e.key === '/') {
+          if (e.key === 'Escape' || e.key === '?' || e.key === '/') {
             e.preventDefault();
             closeShortcuts();
           }
@@ -1374,7 +1374,7 @@
 
         // Esc → remove last staged file (no-op if none)
         if (e.key === 'Escape') {
-          if (stagedFiles.length) {
+          if (stagedFiles.length && !e.repeat) {
             e.preventDefault();
             removeFileAt(stagedFiles.length - 1);
           }
@@ -1413,6 +1413,7 @@
             ? (cur + 1) % tabs.length
             : (cur - 1 + tabs.length) % tabs.length;
           tabs[next].click();
+          tabs[next].focus();
         }
       });
 
