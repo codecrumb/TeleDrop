@@ -857,6 +857,11 @@
       const silentToggle = document.getElementById('silent-toggle');
       const shortcutsModal  = document.getElementById('shortcuts-modal');
 
+      // ── Platform detection ───────────────────────────────────────────────
+      if (/Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent)) {
+        document.body.classList.add('is-mac');
+      }
+
       // ── App state ─────────────────────────────────────────────────────────
       let mode = 'auto';
       // Each entry: { file: File, previewUrl: string|null }
@@ -892,6 +897,14 @@
 
       // Fetch Turnstile site key from server (null if not configured → feature disabled)
       fetch('/api/auth').then(r => r.json()).then(d => { turnstileSiteKey = d.turnstileSiteKey || null; }).catch(() => {});
+
+      // ── Shortcuts modal ───────────────────────────────────────────────────
+      function openShortcuts()  { shortcutsModal.hidden = false; }
+      function closeShortcuts() { shortcutsModal.hidden = true; }
+
+      shortcutsModal.addEventListener('click', (e) => {
+        if (e.target === shortcutsModal) closeShortcuts();
+      });
 
       function showTurnstile() {
         if (!turnstileSiteKey) return; // Turnstile not configured
