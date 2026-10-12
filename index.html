@@ -164,21 +164,49 @@
 
     #lock-btn:hover { border-color: #555; color: #999; }
 
-    /* ── Original-quality toggle ──────────────────────────────────────── */
+    /* ── Original-quality switch ──────────────────────────────────────── */
     #quality-toggle {
       display: none;
       align-items: center;
-      gap: 8px;
-      font-size: 0.78rem;
-      color: #666;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: #777;
       margin-bottom: 10px;
       cursor: pointer;
       user-select: none;
+      transition: color 0.12s;
     }
 
     #quality-toggle.visible { display: flex; }
-    #quality-toggle input { accent-color: #fff; cursor: pointer; }
     #quality-toggle:hover { color: #bbb; }
+    #quality-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+
+    #quality-toggle .switch {
+      position: relative;
+      flex: none;
+      width: 32px;
+      height: 18px;
+      border-radius: 9px;
+      background: #262626;
+      transition: background 0.15s;
+    }
+
+    #quality-toggle .switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #777;
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    #quality-toggle input:checked + .switch { background: #fff; }
+    #quality-toggle input:checked + .switch::after { transform: translateX(14px); background: #000; }
+    #quality-toggle input:focus-visible + .switch { outline: 2px solid #4a9eff; outline-offset: 2px; }
+    #quality-toggle small { color: #4a4a4a; font-size: 0.72rem; margin-left: 4px; }
 
     /* ── Drop zone ────────────────────────────────────────────────────── */
     #drop-zone {
@@ -689,17 +717,18 @@
       <!-- Drop warning (oversized files etc.) -->
       <div id="drop-warning"></div>
 
+      <!-- Original-quality switch (images only) -->
+      <label id="quality-toggle">
+        <input type="checkbox" id="quality-checkbox" role="switch">
+        <span class="switch" aria-hidden="true"></span>
+        <span class="switch-label">Original quality <small>send photos &amp; videos as files</small></span>
+      </label>
+
       <!-- Text input -->
       <textarea id="text-input" placeholder="Paste a link or type a note…" rows="3" spellcheck="true" maxlength="4096"></textarea>
 
       <!-- Char counter -->
       <div id="char-counter"></div>
-
-      <!-- Original-quality toggle (images only) -->
-      <label id="quality-toggle">
-        <input type="checkbox" id="quality-checkbox">
-        Send images as files (original quality)
-      </label>
 
       <!-- Type badge -->
       <div id="type-badge" aria-live="polite"></div>
@@ -1040,6 +1069,13 @@
           : 'Paste a link or type a note…';
       }
 
+      // 'image' | 'video' for files Telegram can show inline, else null
+      function mediaKind(file) {
+        if (file.type.startsWith('image/')) return 'image';
+        if (file.type.startsWith('video/')) return 'video';
+        return null;
+      }
+
       function refreshBadgeAndBtn() {
         const type = detectType();
 
@@ -1054,9 +1090,9 @@
           typeBadge.classList.remove('active');
         }
 
-        const hasImages = stagedFiles.some(x => x.previewUrl);
-        qualityToggle.classList.toggle('visible', hasImages);
-        if (!hasImages) qualityCheckbox.checked = false;
+        const hasMedia = stagedFiles.some(x => mediaKind(x.file));
+        qualityToggle.classList.toggle('visible', hasMedia);
+        if (!hasMedia) qualityCheckbox.checked = false;
         sendBtn.disabled = !type;
         updatePlaceholder();
       }
@@ -1353,10 +1389,10 @@
         } else {
           const snapshot = [...stagedFiles];
           const links = [];
-          const allImages = snapshot.every(x => x.previewUrl);
+          const allMedia = snapshot.every(x => !x.isFolder && mediaKind(x.file));
           const asFiles = qualityCheckbox.checked;
 
-          if (allImages && snapshot.length > 1 && !asFiles) {
+          if (allMedia && snapshot.length > 1 && !asFiles) {
             // Send as album(s)
             const totalBatches = Math.ceil(snapshot.length / ALBUM_MAX);
             for (let b = 0; b < totalBatches; b++) {
@@ -1377,7 +1413,7 @@
                 : 'Sending…');
               showSending();
               const { file } = snapshot[i];
-              const fileType = (!asFiles && file.type.startsWith('image/')) ? 'image' : 'file';
+              const fileType = (!asFiles && mediaKind(file)) || 'file';
               const result = await sendPayload(fileType, file, null, token, caption);
               if (!result) return;
               links.push(buildTgLink(result.chatId, result.messageId));
@@ -1392,7 +1428,10 @@
         try {
           const fd = new FormData();
           fd.append('type', 'album');
-          files.forEach((item, i) => fd.append(`file${i}`, item.file));
+          files.forEach((item, i) => {
+            fd.append(`file${i}`, item.file);
+            fd.append(`type${i}`, mediaKind(item.file) === 'video' ? 'video' : 'photo');
+          });
           if (caption) fd.append('caption', caption);
           if (sendSilent) fd.append('silent', 'true');
           const res = await fetch('/api/send', {

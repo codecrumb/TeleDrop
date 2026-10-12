@@ -7,11 +7,11 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 ## Features
 
 - **Drag & drop** files (or click to browse) — supports multiple files at once
-- **Image albums** — groups up to 10 images into a single Telegram album
+- **Photos & videos** — sent inline; albums group up to 10 into one message
 - **Captions** — optional captions for files and links
 - **Silent send** — right-click the send button to toggle silent notifications
 - **Links** and **text notes** auto-detected
-- **Original quality** — toggle appears when images are staged to send them as uncompressed files
+- **Original quality** — switch sends photos and videos as uncompressed files
 - **PIN auth** with optional 30-day "remember me" cookie
 - **Turnstile CAPTCHA** after 3 failed PIN attempts (optional)
 - **Deep links** after every send — jump straight to the message in Telegram
@@ -25,7 +25,7 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 
 - Frontend: single-file HTML/CSS/JS — no build step
 - Backend: Cloudflare Pages Functions
-- Delivery: Telegram Bot API (`sendPhoto`, `sendDocument`, `sendMessage`, `sendMediaGroup`)
+- Delivery: Telegram Bot API (`sendPhoto`, `sendVideo`, `sendDocument`, `sendMessage`, `sendMediaGroup`)
 
 ## Setup
 

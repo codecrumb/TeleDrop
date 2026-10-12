@@ -98,6 +98,16 @@ export async function onRequestPost(context) {
     if (cap) { fd.append('caption', cap); fd.append('parse_mode', 'HTML'); }
     tgRes = await fetch(`${apiBase}/sendPhoto`, { method: 'POST', body: fd });
 
+  } else if (type === 'video' && file) {
+    const cap = [caption.trim(), spoiler.trim()].filter(Boolean).join('\n');
+    const fd = new FormData();
+    fd.append('chat_id', env.CHAT_ID);
+    fd.append('video', file);
+    fd.append('supports_streaming', 'true');
+    if (silent) fd.append('disable_notification', 'true');
+    if (cap) { fd.append('caption', cap); fd.append('parse_mode', 'HTML'); }
+    tgRes = await fetch(`${apiBase}/sendVideo`, { method: 'POST', body: fd });
+
   } else if (type === 'file' && file) {
     const cap = [caption.trim(), spoiler.trim()].filter(Boolean).join('\n');
     const fd = new FormData();
@@ -130,7 +140,9 @@ export async function onRequestPost(context) {
       if (!f) break;
       const attachKey = `file${i}`;
       fd.append(attachKey, f);
-      const mediaObj = { type: 'photo', media: `attach://${attachKey}` };
+      const mediaType = formData.get(`type${i}`) === 'video' ? 'video' : 'photo';
+      const mediaObj = { type: mediaType, media: `attach://${attachKey}` };
+      if (mediaType === 'video') mediaObj.supports_streaming = true;
       if (i === 0) {
         const cap = [caption.trim(), spoiler.trim()].filter(Boolean).join('\n');
         if (cap) { mediaObj.caption = cap; mediaObj.parse_mode = 'HTML'; }
