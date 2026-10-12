@@ -20,6 +20,8 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 **Keyboard shortcuts:**
 - `Cmd/Ctrl+Enter` — send from textarea
 - `Cmd/Ctrl+O` — open file picker
+- `Q` — toggle original quality
+- `S` — toggle silent mode
 
 ## Stack
 

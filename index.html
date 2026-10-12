@@ -801,6 +801,18 @@
         </div>
       </div>
       <div class="sc-row">
+        <span class="sc-desc">Toggle original quality</span>
+        <div class="sc-keys">
+          <span class="kbd">Q</span>
+        </div>
+      </div>
+      <div class="sc-row">
+        <span class="sc-desc">Toggle silent mode</span>
+        <div class="sc-keys">
+          <span class="kbd">S</span>
+        </div>
+      </div>
+      <div class="sc-row">
         <span class="sc-desc">Remove last file</span>
         <div class="sc-keys">
           <span class="kbd">Esc</span>
@@ -1362,6 +1374,22 @@
         if (e.key === 'o' && mod) {
           e.preventDefault();
           fileInput.click();
+          return;
+        }
+
+        // Q → toggle original quality (only while the switch is visible)
+        if ((e.key === 'q' || e.key === 'Q') && !mod && !e.altKey && !e.repeat) {
+          if (qualityToggle.classList.contains('visible')) {
+            e.preventDefault();
+            qualityCheckbox.checked = !qualityCheckbox.checked;
+          }
+          return;
+        }
+
+        // S → toggle silent mode
+        if ((e.key === 's' || e.key === 'S') && !mod && !e.altKey && !e.repeat) {
+          e.preventDefault();
+          setSilent(!sendSilent);
           return;
         }
       });
