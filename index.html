@@ -164,30 +164,21 @@
 
     #lock-btn:hover { border-color: #555; color: #999; }
 
-    /* ── Mode tabs ────────────────────────────────────────────────────── */
-    .mode-tabs {
-      display: flex;
-      border: 1px solid #2a2a2a;
-      border-radius: 10px;
-      overflow: hidden;
+    /* ── Original-quality toggle ──────────────────────────────────────── */
+    #quality-toggle {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: #666;
       margin-bottom: 10px;
-    }
-
-    .mode-tab {
-      flex: 1;
-      padding: 8px 6px;
-      font-size: 0.8rem;
-      font-weight: 500;
-      border: none;
-      background: transparent;
-      color: #555;
       cursor: pointer;
-      transition: background 0.12s, color 0.12s;
+      user-select: none;
     }
 
-    .mode-tab + .mode-tab { border-left: 1px solid #2a2a2a; }
-    .mode-tab.active { background: #fff; color: #000; }
-    .mode-tab:not(.active):hover { background: #1c1c1c; color: #bbb; }
+    #quality-toggle.visible { display: flex; }
+    #quality-toggle input { accent-color: #fff; cursor: pointer; }
+    #quality-toggle:hover { color: #bbb; }
 
     /* ── Drop zone ────────────────────────────────────────────────────── */
     #drop-zone {
@@ -210,7 +201,6 @@
       background: #0c1620;
     }
 
-    #drop-zone.dimmed { display: none; }
     #text-input.hidden { display: none; }
 
     /* ── Drop zone: idle state ────────────────────────────────────────── */
@@ -672,14 +662,6 @@
 
     <!-- Input form -->
     <div id="input-form">
-      <!-- Mode tabs -->
-      <div class="mode-tabs" id="mode-tabs" role="tablist">
-        <button class="mode-tab active" data-mode="auto" type="button" role="tab" aria-selected="true" tabindex="0">Auto</button>
-        <button class="mode-tab" data-mode="file" type="button" role="tab" tabindex="-1">File</button>
-        <button class="mode-tab" data-mode="text" type="button" role="tab" tabindex="-1">Text</button>
-        <button class="mode-tab" data-mode="link" type="button" role="tab" tabindex="-1">Link</button>
-      </div>
-
       <!-- Drop zone -->
       <div id="drop-zone" data-state="idle" tabindex="0" role="button" aria-label="Drop files here or click to browse">
 
@@ -712,6 +694,12 @@
 
       <!-- Char counter -->
       <div id="char-counter"></div>
+
+      <!-- Original-quality toggle (images only) -->
+      <label id="quality-toggle">
+        <input type="checkbox" id="quality-checkbox">
+        Send images as files (original quality)
+      </label>
 
       <!-- Type badge -->
       <div id="type-badge" aria-live="polite"></div>
@@ -784,22 +772,6 @@
         </div>
       </div>
       <div class="sc-row">
-        <span class="sc-desc">Switch tab</span>
-        <div class="sc-keys">
-          <span class="kbd mac-only">⌥</span><span class="kbd win-only">Alt</span>
-          <span class="kbd-sep">+</span>
-          <span class="kbd">1–4</span>
-        </div>
-      </div>
-      <div class="sc-row">
-        <span class="sc-desc">Cycle tabs</span>
-        <div class="sc-keys">
-          <span class="kbd">←</span>
-          <span class="kbd-sep">/</span>
-          <span class="kbd">→</span>
-        </div>
-      </div>
-      <div class="sc-row">
         <span class="sc-desc">Remove last file</span>
         <div class="sc-keys">
           <span class="kbd">Esc</span>
@@ -834,7 +806,8 @@
       const pinError     = document.getElementById('pin-error');
       const app          = document.getElementById('app');
       const lockBtn      = document.getElementById('lock-btn');
-      const modeTabs     = document.getElementById('mode-tabs');
+      const qualityToggle   = document.getElementById('quality-toggle');
+      const qualityCheckbox = document.getElementById('quality-checkbox');
       const dropZone     = document.getElementById('drop-zone');
       const fileInput    = document.getElementById('file-input');
       const folderInput  = document.getElementById('folder-input');
@@ -865,7 +838,6 @@
       }
 
       // ── App state ─────────────────────────────────────────────────────────
-      let mode = 'auto';
       // Each entry: { file: File, previewUrl: string|null }
       let stagedFiles = [];
       let dragCounter = 0;
@@ -1050,70 +1022,28 @@
         }
       });
 
-      // ── Mode tabs ─────────────────────────────────────────────────────────
-      modeTabs.addEventListener('click', (e) => {
-        const tab = e.target.closest('.mode-tab');
-        if (!tab) return;
-        modeTabs.querySelectorAll('.mode-tab').forEach(t => {
-          t.classList.remove('active');
-          t.setAttribute('aria-selected', 'false');
-          t.setAttribute('tabindex', '-1');
-        });
-        tab.classList.add('active');
-        tab.setAttribute('aria-selected', 'true');
-        tab.setAttribute('tabindex', '0');
-        mode = tab.dataset.mode;
-
-        if (mode === 'text' || mode === 'link') clearFiles();
-        dropZone.classList.toggle('dimmed', mode === 'text' || mode === 'link');
-
-        refreshBadgeAndBtn();
-      });
-
-      // Arrow-key navigation within the tablist (ARIA roving tabindex)
-      modeTabs.addEventListener('keydown', (e) => {
-        const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
-        const cur = tabs.findIndex(t => t === document.activeElement);
-        if (cur === -1) return;
-        let next = cur;
-        if (e.key === 'ArrowRight') next = (cur + 1) % tabs.length;
-        else if (e.key === 'ArrowLeft') next = (cur - 1 + tabs.length) % tabs.length;
-        else if (e.key === 'Home') next = 0;
-        else if (e.key === 'End') next = tabs.length - 1;
-        else return;
-        e.preventDefault();
-        tabs[next].click();
-        tabs[next].focus();
-      });
-
       // ── Type detection ────────────────────────────────────────────────────
+      const URL_RE = /^(https?:\/\/|www\.)\S+$|^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/i;
+
       function detectType() {
-        if (mode === 'file') {
-          return stagedFiles.length ? 'files' : null;
-        }
-        if (mode === 'text') return textInput.value.trim() ? 'text' : null;
-        if (mode === 'link') return textInput.value.trim() ? 'link' : null;
-        // Auto
         if (stagedFiles.length) return 'files';
         const t = textInput.value.trim();
         if (!t) return null;
-        return /^https?:\/\//i.test(t) ? 'link' : 'text';
+        return URL_RE.test(t) ? 'link' : 'text';
       }
 
       const TYPE_LABELS = { files: '📎 Files', link: '🔗 Link', text: '📝 Text note' };
 
       function updatePlaceholder() {
-        const hasFiles = stagedFiles.length > 0;
-        if (mode === 'link') textInput.placeholder = 'Paste a URL…';
-        else if (mode === 'text') textInput.placeholder = 'Type a note…';
-        else if (mode === 'file' || (mode === 'auto' && hasFiles)) textInput.placeholder = 'Add a caption… (optional)';
-        else textInput.placeholder = 'Paste a link or type a note…';
+        textInput.placeholder = stagedFiles.length
+          ? 'Add a caption… (optional)'
+          : 'Paste a link or type a note…';
       }
 
       function refreshBadgeAndBtn() {
         const type = detectType();
 
-        if (mode === 'auto' && type) {
+        if (type) {
           const label = type === 'files'
             ? (stagedFiles.length === 1 ? '📎 File' : `📎 ${stagedFiles.length} files`)
             : TYPE_LABELS[type];
@@ -1124,6 +1054,9 @@
           typeBadge.classList.remove('active');
         }
 
+        const hasImages = stagedFiles.some(x => x.previewUrl);
+        qualityToggle.classList.toggle('visible', hasImages);
+        if (!hasImages) qualityCheckbox.checked = false;
         sendBtn.disabled = !type;
         updatePlaceholder();
       }
@@ -1233,12 +1166,11 @@
       // ── Drop zone interactions ────────────────────────────────────────────
       dropZone.addEventListener('click', (e) => {
         if (e.target.closest('.chip-remove')) return;
-        if (dropZone.classList.contains('dimmed')) return;
         fileInput.click();
       });
 
       dropZone.addEventListener('keydown', (e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && !dropZone.classList.contains('dimmed')) {
+        if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           fileInput.click();
         }
@@ -1276,7 +1208,7 @@
         dragCounter++;
         if (inSuccessState()) {
           stateSuccess.classList.add('drag-over');
-        } else if (!dropZone.classList.contains('dimmed')) {
+        } else {
           dropZone.classList.add('drag-over');
         }
       });
@@ -1308,11 +1240,10 @@
           const files = Array.from(e.dataTransfer.files);
           if (!files.length) return;
           if (inSuccessState()) { clearFiles(); textInput.value = ''; showIdle(); }
-          if (!dropZone.classList.contains('dimmed')) addFiles(files);
+          addFiles(files);
           return;
         }
 
-        if (dropZone.classList.contains('dimmed')) return;
         if (inSuccessState()) { clearFiles(); textInput.value = ''; showIdle(); }
         handleDroppedFolderEntries(entries);
       });
@@ -1394,29 +1325,8 @@
         // Cmd/Ctrl+O → open file picker
         if (e.key === 'o' && mod) {
           e.preventDefault();
-          if (!dropZone.classList.contains('dimmed')) fileInput.click();
+          fileInput.click();
           return;
-        }
-
-        // Alt+1–4 → jump to specific tab
-        if (e.altKey && ['1', '2', '3', '4'].includes(e.key)) {
-          e.preventDefault();
-          const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
-          const idx = parseInt(e.key, 10) - 1;
-          if (tabs[idx]) tabs[idx].click();
-          return;
-        }
-
-        // ←/→ → cycle mode tabs
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-          e.preventDefault();
-          const tabs = Array.from(modeTabs.querySelectorAll('.mode-tab'));
-          const cur = tabs.findIndex(t => t.classList.contains('active'));
-          const next = e.key === 'ArrowRight'
-            ? (cur + 1) % tabs.length
-            : (cur - 1 + tabs.length) % tabs.length;
-          tabs[next].click();
-          tabs[next].focus();
         }
       });
 
@@ -1444,8 +1354,9 @@
           const snapshot = [...stagedFiles];
           const links = [];
           const allImages = snapshot.every(x => x.previewUrl);
+          const asFiles = qualityCheckbox.checked;
 
-          if (allImages && snapshot.length > 1) {
+          if (allImages && snapshot.length > 1 && !asFiles) {
             // Send as album(s)
             const totalBatches = Math.ceil(snapshot.length / ALBUM_MAX);
             for (let b = 0; b < totalBatches; b++) {
@@ -1466,7 +1377,7 @@
                 : 'Sending…');
               showSending();
               const { file } = snapshot[i];
-              const fileType = (mode !== 'file' && file.type.startsWith('image/')) ? 'image' : 'file';
+              const fileType = (!asFiles && file.type.startsWith('image/')) ? 'image' : 'file';
               const result = await sendPayload(fileType, file, null, token, caption);
               if (!result) return;
               links.push(buildTgLink(result.chatId, result.messageId));

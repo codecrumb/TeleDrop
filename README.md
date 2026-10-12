@@ -10,7 +10,8 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 - **Image albums** — groups up to 10 images into a single Telegram album
 - **Captions** — optional captions for files and links
 - **Silent send** — right-click the send button to toggle silent notifications
-- **Links** and **text notes** auto-detected, or manually override with tabs
+- **Links** and **text notes** auto-detected
+- **Original quality** — toggle appears when images are staged to send them as uncompressed files
 - **PIN auth** with optional 30-day "remember me" cookie
 - **Turnstile CAPTCHA** after 3 failed PIN attempts (optional)
 - **Deep links** after every send — jump straight to the message in Telegram
@@ -19,7 +20,6 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 **Keyboard shortcuts:**
 - `Cmd/Ctrl+Enter` — send from textarea
 - `Cmd/Ctrl+O` — open file picker
-- `←/→` — navigate mode tabs
 
 ## Stack
 
