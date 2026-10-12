@@ -1334,16 +1334,17 @@
         // 3. Focused in pin-input → ignore
         if (document.activeElement === pinInput) return;
 
-        // 4. Focused in text-input → only Cmd/Ctrl+Enter fires
-        if (document.activeElement === textInput) {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            if (!sendBtn.disabled) doSend();
-          }
+        // 4. Cmd/Ctrl+Enter → send from anywhere
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          if (inputForm.style.display !== 'none' && !sendBtn.disabled) doSend();
           return;
         }
 
-        // 5. Idle focus → all shortcuts
+        // 5. Focused in text-input → other keys are typing
+        if (document.activeElement === textInput) return;
+
+        // 6. Idle focus → all shortcuts
         const mod = e.metaKey || e.ctrlKey;
 
         // Cmd/Ctrl+Esc → lock app
