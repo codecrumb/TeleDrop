@@ -886,6 +886,22 @@
       let sendSilent = false;
 
       const ZIP_SIZE_LIMIT = 45 * 1024 * 1024; // 45 MB — Telegram bot API limit is 50 MB
+      const PART_SIZE = 45 * 1024 * 1024; // files larger than this are split into parts of this size
+
+      // Split a file into <name>.part1, <name>.part2, … (zero-padded only when
+      // there are 10+ parts, so shell globs sort correctly). Rejoin with
+      // `cat name.part* > name` or `copy /b name.part1+name.part2 name`.
+      function splitFile(file) {
+        const total = Math.ceil(file.size / PART_SIZE);
+        const width = String(total).length;
+        const parts = [];
+        for (let i = 0; i < total; i++) {
+          const blob = file.slice(i * PART_SIZE, (i + 1) * PART_SIZE);
+          parts.push(new File([blob], `${file.name}.part${String(i + 1).padStart(width, '0')}`,
+            { type: 'application/octet-stream' }));
+        }
+        return parts;
+      }
 
       // ── Auth ──────────────────────────────────────────────────────────────
       function getToken() {
@@ -1126,20 +1142,9 @@
 
       // ── File management ───────────────────────────────────────────────────
       function addFiles(fileList, asFolder) {
-        const oversized = [];
         for (const file of fileList) {
-          if (file.size > 100 * 1024 * 1024) {
-            oversized.push(file.name);
-            continue;
-          }
           const previewUrl = (!asFolder && file.type.startsWith('image/')) ? URL.createObjectURL(file) : null;
           stagedFiles.push({ file, previewUrl, isFolder: !!asFolder });
-        }
-        if (oversized.length) {
-          const names = oversized.length === 1
-            ? `"${oversized[0]}" is`
-            : `${oversized.length} files are`;
-          showDropWarning(`${names} over the 100 MB limit and were skipped.`);
         }
         renderChips();
         refreshBadgeAndBtn();
@@ -1418,7 +1423,8 @@
         } else {
           const snapshot = [...stagedFiles];
           const links = [];
-          const allMedia = snapshot.every(x => !x.isFolder && mediaKind(x.file));
+          const needsSplit = snapshot.some(x => x.file.size > PART_SIZE);
+          const allMedia = !needsSplit && snapshot.every(x => !x.isFolder && mediaKind(x.file));
           const asFiles = qualityCheckbox.checked;
 
           if (allMedia && snapshot.length > 1 && !asFiles) {
@@ -1435,13 +1441,23 @@
               links.push(buildTgLink(result.chatId, result.messageId));
             }
           } else {
-            // Send files individually
+            // Send files individually (oversized files go out as .partN documents)
             for (let i = 0; i < snapshot.length; i++) {
-              setSendingLabel(snapshot.length > 1
-                ? `Sending ${i + 1} of ${snapshot.length}…`
-                : 'Sending…');
-              showSending();
               const { file } = snapshot[i];
+              const prefix = snapshot.length > 1 ? `${i + 1} of ${snapshot.length}` : '';
+              if (file.size > PART_SIZE) {
+                const parts = splitFile(file);
+                for (let p = 0; p < parts.length; p++) {
+                  setSendingLabel(`Sending ${prefix ? prefix + ' · ' : ''}part ${p + 1} of ${parts.length}…`);
+                  showSending();
+                  const result = await sendPayload('file', parts[p], null, token, p === 0 ? caption : '');
+                  if (!result) return;
+                  links.push(buildTgLink(result.chatId, result.messageId));
+                }
+                continue;
+              }
+              setSendingLabel(prefix ? `Sending ${prefix}…` : 'Sending…');
+              showSending();
               const fileType = (!asFiles && mediaKind(file)) || 'file';
               const result = await sendPayload(fileType, file, null, token, caption);
               if (!result) return;

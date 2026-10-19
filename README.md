@@ -8,6 +8,7 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 
 - **Drag & drop** files (or click to browse) — supports multiple files at once
 - **Photos & videos** — sent inline; albums group up to 10 into one message
+- **Large files** — anything over 45 MB is split into `name.part1`, `name.part2`, … and sent as documents (Telegram bots cap uploads at 50 MB). Rejoin with `cat name.part* > name` (macOS/Linux) or `copy /b name.part1+name.part2+name.part3 name` (Windows)
 - **Captions** — optional captions for files and links
 - **Silent send** — right-click the send button to toggle silent notifications
 - **Links** and **text notes** auto-detected
