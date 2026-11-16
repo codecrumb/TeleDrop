@@ -63,7 +63,7 @@ export async function onRequestPost(context) {
   }
 
   const contentType = request.headers.get('Content-Type') || '';
-  let type, content, file, caption = '', silent = false, formData;
+  let type, content, file, caption = '', silent = false, formData, body;
   let isAlbum = false;
 
   if (contentType.includes('multipart/form-data')) {
@@ -77,7 +77,6 @@ export async function onRequestPost(context) {
     caption = formData.get('caption') || '';
     silent = formData.get('silent') === 'true';
   } else {
-    let body;
     try {
       body = await request.json();
     } catch {
@@ -170,6 +169,39 @@ export async function onRequestPost(context) {
       if (cap) { fd.append('caption', cap); fd.append('parse_mode', 'HTML'); }
       tgRes = await fetch(`${apiBase}/sendDocument`, { method: 'POST', body: fd });
     }
+
+  } else if (type === 'rejoin') {
+    // After a split file: one worker-built message telling future-you how to
+    // reassemble it. Commands are <code> spans, which Telegram renders as
+    // monospace with tap-to-copy — not a "text note", so no 📝 prefix.
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const parts = Number.isInteger(body.parts) && body.parts >= 1 && body.parts <= 99 ? body.parts : 0;
+    if (!name || name.length > 255 || !parts) return json({ error: 'Invalid rejoin parameters' }, 400);
+    if (body.replyTo !== undefined && (!Number.isInteger(body.replyTo) || body.replyTo <= 0)) {
+      return json({ error: 'Invalid rejoin parameters' }, 400);
+    }
+    const width = String(parts).length;
+    const part = i => `${name}.part${String(i + 1).padStart(width, '0')}`;
+    // Escape for double-quoted shell strings ($ ` " \), so an odd file name
+    // can't execute or break the command the user pastes.
+    const q = s => `"${s.replace(/([$`"\\])/g, '\\$1')}"`;
+    const names = Array.from({ length: parts }, (_, i) => part(i));
+    const cat = `cat ${names.map(q).join(' ')} > ${q(name)}`;
+    const copy = `copy /b ${names.map(q).join('+')} ${q(name)}`;
+    const fd = new FormData();
+    fd.append('chat_id', env.CHAT_ID);
+    fd.append('text',
+      `🧩 ${escapeHtml(name)} was sent in ${parts} part${parts === 1 ? '' : 's'}. Rejoin the original file with:\n`
+      + `macOS/Linux: <code>${escapeHtml(cat)}</code>\n`
+      + `Windows: <code>${escapeHtml(copy)}</code>`
+      + ipSpoiler(request));
+    fd.append('parse_mode', 'HTML');
+    // Reply to the last part so the instructions stay attached to the file.
+    if (Number.isInteger(body.replyTo) && body.replyTo > 0) {
+      fd.append('reply_parameters', JSON.stringify({ message_id: body.replyTo }));
+    }
+    if (silent) fd.append('disable_notification', 'true');
+    tgRes = await fetch(`${apiBase}/sendMessage`, { method: 'POST', body: fd });
 
   } else if (type === 'album') {
     isAlbum = true;

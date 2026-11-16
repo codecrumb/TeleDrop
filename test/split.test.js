@@ -10,7 +10,7 @@ const end = html.indexOf('// ── Auth');
 assert.ok(start !== -1 && end > start, 'could not find splitFile in index.html');
 // Shrink the part size so tests stay small; the shipped value is 45 MB.
 const source = html.slice(start, end).replace('PART_SIZE = 45 * 1024 * 1024', 'PART_SIZE = 10');
-const { splitFile, rejoinMessage } = new Function('File', `${source}; return { splitFile, rejoinMessage };`)(File);
+const { splitFile } = new Function('File', `${source}; return { splitFile };`)(File);
 
 function fileOfSize(bytes, name = 'big.bin') {
   const data = new Uint8Array(bytes);
@@ -53,25 +53,3 @@ describe('large files: splitFile', function () {
   });
 });
 
-describe('large files: rejoinMessage', function () {
-  it('lists the exact part names and both rejoin commands', function () {
-    const msg = rejoinMessage('archive.zip', 3);
-    assert.ok(msg.includes('archive.zip was sent in 3 parts'));
-    assert.ok(msg.includes('cat "archive.zip.part1" "archive.zip.part2" "archive.zip.part3" > "archive.zip"'));
-    assert.ok(msg.includes('copy /b "archive.zip.part1"+"archive.zip.part2"+"archive.zip.part3" "archive.zip"'));
-  });
-
-  it('matches the padding splitFile uses for 10+ parts', function () {
-    const parts = splitFile(fileOfSize(100));
-    const msg = rejoinMessage('big.bin', parts.length);
-    assert.ok(msg.includes('"big.bin.part01"'));
-    assert.ok(msg.includes('"big.bin.part10"'));
-  });
-
-  it('escapes double quotes so odd names cannot break the commands', function () {
-    const msg = rejoinMessage('my "file".zip', 2);
-    const commands = msg.split('\n').filter(l => l.includes('cat ') || l.includes('copy /b')).join('\n');
-    assert.ok(commands.includes('\\"file\\"'));
-    assert.ok(!/(?<!\\)"file/.test(commands), 'every embedded quote in a command must be escaped');
-  });
-});

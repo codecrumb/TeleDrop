@@ -903,18 +903,6 @@
         return parts;
       }
 
-      // Sent after the last part so future-you knows how to reassemble the file.
-      // Double quotes are escaped so odd file names can't break the commands.
-      function rejoinMessage(name, total) {
-        const width = String(total).length;
-        const partName = i => `${name}.part${String(i + 1).padStart(width, '0')}`;
-        const q = s => `"${s.replace(/"/g, '\\"')}"`;
-        const parts = Array.from({ length: total }, (_, i) => q(partName(i)));
-        return `🧩 ${name} was sent in ${total} parts. Rejoin the original file with:\n`
-          + `macOS/Linux:  cat ${parts.join(' ')} > ${q(name)}\n`
-          + `Windows:  copy /b ${parts.join('+')} ${q(name)}`;
-      }
-
       // ── Auth ──────────────────────────────────────────────────────────────
       function getToken() {
         const s = sessionStorage.getItem('teledrop_token');
@@ -1470,25 +1458,31 @@
               const prefix = snapshot.length > 1 ? `${i + 1} of ${snapshot.length}` : '';
               if (file.size > PART_SIZE) {
                 const parts = splitFile(file);
+                let lastPartId = null;
                 for (let p = 0; p < parts.length; p++) {
-                  setSendingLabel(`Sending ${prefix ? prefix + ' · ' : ''}part ${p + 1} of ${parts.length}…`);
+                  const base = `Sending ${prefix ? prefix + ' · ' : ''}part ${p + 1} of ${parts.length}`;
+                  setSendingLabel(progressLabeler(base)(0));
                   showSending();
-                  const result = await sendPayload('file', parts[p], null, token, p === 0 ? caption : '');
+                  const result = await sendPayload('file', parts[p], null, token, p === 0 ? caption : '',
+                    progressLabeler(base));
                   if (!result) return;
+                  lastPartId = result.messageId;
                   links.push(buildTgLink(result.chatId, result.messageId));
                 }
-                // Close the series with the rejoin instructions.
+                // Close the series with the rejoin instructions (worker-built,
+                // replying to the last part).
                 setSendingLabel('Sending rejoin instructions…');
                 showSending();
-                const rejoin = await sendPayload('text', null, rejoinMessage(file.name, parts.length), token);
+                const rejoin = await sendRejoin(file.name, parts.length, token, lastPartId);
                 if (!rejoin) return;
                 links.push(buildTgLink(rejoin.chatId, rejoin.messageId));
                 continue;
               }
-              setSendingLabel(prefix ? `Sending ${prefix}…` : 'Sending…');
+              const base = prefix ? `Sending ${prefix}` : 'Sending';
+              setSendingLabel(progressLabeler(base)(0));
               showSending();
               const fileType = (!asFiles && mediaKind(file)) || 'file';
-              const result = await sendPayload(fileType, file, null, token, caption);
+              const result = await sendPayload(fileType, file, null, token, caption, progressLabeler(base));
               if (!result) return;
               links.push(buildTgLink(result.chatId, result.messageId));
             }
@@ -1498,20 +1492,59 @@
         }
       }
 
-      async function sendAlbum(files, caption, token) {
+      // XMLHttpRequest rather than fetch: only XHR reports upload progress.
+      // Same handling as sendPayload's fetch branch: 401 re-prompts for the PIN,
+      // other failures show an error and resolve null.
+      function postForm(token, fd, onProgress) {
+        return new Promise((resolve) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/send');
+          xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+          if (onProgress) {
+            xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+            xhr.upload.onload = () => onProgress(1);
+          }
+          xhr.onload = () => {
+            if (xhr.status === 401) { clearToken(); showPinOverlay(); return resolve(null); }
+            let data = null;
+            try { data = JSON.parse(xhr.responseText); } catch { /* handled below */ }
+            if (xhr.status < 200 || xhr.status >= 300) {
+              showError((data && data.error) || `Send failed (${xhr.status})`);
+              return resolve(null);
+            }
+            if (!data) { showError('Unexpected server response'); return resolve(null); }
+            resolve(data);
+          };
+          xhr.onerror = () => { showError('Network error — check your connection.'); resolve(null); };
+          xhr.send(fd);
+        });
+      }
+
+      async function sendAlbum(files, caption, token, onProgress) {
+        const fd = new FormData();
+        fd.append('type', 'album');
+        files.forEach((item, i) => {
+          fd.append(`file${i}`, item.file);
+          fd.append(`type${i}`, mediaKind(item.file) === 'video' ? 'video' : 'photo');
+        });
+        if (caption) fd.append('caption', caption);
+        if (sendSilent) fd.append('silent', 'true');
+        return postForm(token, fd, onProgress);
+      }
+
+      // Asks the worker to post the rejoin instructions for a split file
+      // (type: 'rejoin'). The worker formats the commands as tappable code,
+      // replies to the last part, and appends the IP spoiler — the client
+      // only sends the name, part count and the message id to reply to.
+      async function sendRejoin(name, total, token, replyTo) {
         try {
-          const fd = new FormData();
-          fd.append('type', 'album');
-          files.forEach((item, i) => {
-            fd.append(`file${i}`, item.file);
-            fd.append(`type${i}`, mediaKind(item.file) === 'video' ? 'video' : 'photo');
-          });
-          if (caption) fd.append('caption', caption);
-          if (sendSilent) fd.append('silent', 'true');
           const res = await fetch('/api/send', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token },
-            body: fd,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({ type: 'rejoin', name, parts: total, replyTo, silent: sendSilent }),
           });
           if (res.status === 401) { clearToken(); showPinOverlay(); return null; }
           const data = await res.json();
@@ -1523,30 +1556,24 @@
         }
       }
 
-      async function sendPayload(type, file, content, token, caption = '') {
+      async function sendPayload(type, file, content, token, caption = '', onProgress) {
+        if (file) {
+          const fd = new FormData();
+          fd.append('type', type);
+          fd.append('file', file);
+          if (caption) fd.append('caption', caption);
+          if (sendSilent) fd.append('silent', 'true');
+          return postForm(token, fd, onProgress);
+        }
         try {
-          let res;
-          if (file) {
-            const fd = new FormData();
-            fd.append('type', type);
-            fd.append('file', file);
-            if (caption) fd.append('caption', caption);
-            if (sendSilent) fd.append('silent', 'true');
-            res = await fetch('/api/send', {
-              method: 'POST',
-              headers: { 'Authorization': 'Bearer ' + token },
-              body: fd,
-            });
-          } else {
-            res = await fetch('/api/send', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token,
-              },
-              body: JSON.stringify({ type, content, silent: sendSilent }),
-            });
-          }
+          const res = await fetch('/api/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({ type, content, silent: sendSilent }),
+          });
 
           if (res.status === 401) { clearToken(); showPinOverlay(); return null; }
 
