@@ -8,8 +8,9 @@ Built on Cloudflare Pages + Functions. No database, no storage — everything go
 
 - **Drag & drop** files (or click to browse) — supports multiple files at once
 - **Photos & videos** — sent inline; albums group up to 10 into one message
-- **Large files** — anything over 45 MB is split into `name.part1`, `name.part2`, … and sent as documents (Telegram bots cap uploads at 50 MB). Rejoin with `cat name.part* > name` (macOS/Linux) or `copy /b name.part1+name.part2+name.part3 name` (Windows)
+- **Large files** — anything over 45 MB is split into `name.part1`, `name.part2`, … and sent as documents (Telegram bots cap uploads at 50 MB). Rejoin with `cat name.part* > name` (macOS/Linux) or `copy /b name.part1+name.part2+name.part3 name` (Windows); the rejoin commands are also sent as a follow-up message after the last part
 - **Captions** — optional captions for files and links
+- **Long notes** — up to 4096 characters go out as a regular message; up to 32,768 as a rich message (Telegram's `sendRichMessage`); anything longer is delivered as a `note.txt` document
 - **Silent send** — right-click the send button to toggle silent notifications
 - **Links** and **text notes** auto-detected
 - **Original quality** — switch sends photos and videos as uncompressed files
@@ -77,7 +78,7 @@ The dev script uses `--binding` flags for local env vars — replace the placeho
 |---|---|
 | Max file size | 100 MB (Cloudflare Pages Functions request body limit) |
 | Max album size | 10 images (Telegram API limit) |
-| Max text length | 4096 characters (Telegram API limit) |
+| Max text length | 4096 as a message · 32,768 as a rich message · longer notes arrive as `note.txt` |
 
 ## Auth notes
 

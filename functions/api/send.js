@@ -34,12 +34,22 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
-function ipSpoiler(request) {
-  const ip = request.headers.get('cf-connecting-ip')
+function clientIp(request) {
+  return request.headers.get('cf-connecting-ip')
     || (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
     || '';
+}
+
+function ipSpoiler(request) {
+  const ip = clientIp(request);
   return ip ? `\n<tg-spoiler>📍 ${escapeHtml(ip)}</tg-spoiler>` : '';
 }
+
+// Telegram's sendMessage carries at most 4096 characters of parsed text;
+// sendRichMessage (rich messages: headings, lists, code, tables…) allows 32768.
+// Anything longer than that goes out as a note.txt document.
+const SEND_TEXT_MAX = 4096;
+const RICH_TEXT_MAX = 32768;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -119,13 +129,47 @@ export async function onRequestPost(context) {
 
   } else if (type === 'text' || type === 'link') {
     if (!content || !content.trim()) return json({ error: 'Missing content' }, 400);
+    content = content.trim();
     const prefix = type === 'link' ? '🔗' : '📝';
-    const fd = new FormData();
-    fd.append('chat_id', env.CHAT_ID);
-    fd.append('text', `${prefix} ${content.trim()}${spoiler}`);
-    fd.append('parse_mode', 'HTML');
-    if (silent) fd.append('disable_notification', 'true');
-    tgRes = await fetch(`${apiBase}/sendMessage`, { method: 'POST', body: fd });
+    const ip = clientIp(request);
+    // Telegram limits count the parsed text, not HTML tags — compare against that.
+    const plainLength = `${prefix} ${content}`.length + (ip ? `\n📍 ${ip}`.length : 0);
+    const body = `${prefix} ${escapeHtml(content)}`;
+
+    if (plainLength <= SEND_TEXT_MAX) {
+      const fd = new FormData();
+      fd.append('chat_id', env.CHAT_ID);
+      // User text is escaped: parse_mode HTML would choke on a stray < or &.
+      let text = body;
+      if (ip) text += `\n<tg-spoiler>📍 ${escapeHtml(ip)}</tg-spoiler>`;
+      fd.append('text', text);
+      fd.append('parse_mode', 'HTML');
+      if (silent) fd.append('disable_notification', 'true');
+      tgRes = await fetch(`${apiBase}/sendMessage`, { method: 'POST', body: fd });
+
+    } else if (plainLength <= RICH_TEXT_MAX) {
+      // Rich messages carry up to 32768 characters — no need to split the note.
+      let html = `<p>${body}</p>`;
+      if (ip) html += `<p><tg-spoiler>📍 ${escapeHtml(ip)}</tg-spoiler></p>`;
+      const payload = { chat_id: env.CHAT_ID, rich_message: { html } };
+      if (silent) payload.disable_notification = true;
+      tgRes = await fetch(`${apiBase}/sendRichMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+    } else {
+      // Extremely long: deliver the text as a .txt document instead.
+      const base = type === 'link' ? 'link' : 'note';
+      const cap = [`${prefix} Text note — ${content.length.toLocaleString('en-US')} characters, too long for a message. Full text: ${base}.txt`, spoiler.trim()].filter(Boolean).join('\n');
+      const fd = new FormData();
+      fd.append('chat_id', env.CHAT_ID);
+      fd.append('document', new Blob([content], { type: 'text/plain' }), `${base}.txt`);
+      if (silent) fd.append('disable_notification', 'true');
+      if (cap) { fd.append('caption', cap); fd.append('parse_mode', 'HTML'); }
+      tgRes = await fetch(`${apiBase}/sendDocument`, { method: 'POST', body: fd });
+    }
 
   } else if (type === 'album') {
     isAlbum = true;

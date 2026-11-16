@@ -725,7 +725,7 @@
       </label>
 
       <!-- Text input -->
-      <textarea id="text-input" placeholder="Paste a link or type a note…" rows="3" spellcheck="true" maxlength="4096"></textarea>
+      <textarea id="text-input" placeholder="Paste a link or type a note…" rows="3" spellcheck="true"></textarea>
 
       <!-- Char counter -->
       <div id="char-counter"></div>
@@ -901,6 +901,18 @@
             { type: 'application/octet-stream' }));
         }
         return parts;
+      }
+
+      // Sent after the last part so future-you knows how to reassemble the file.
+      // Double quotes are escaped so odd file names can't break the commands.
+      function rejoinMessage(name, total) {
+        const width = String(total).length;
+        const partName = i => `${name}.part${String(i + 1).padStart(width, '0')}`;
+        const q = s => `"${s.replace(/"/g, '\\"')}"`;
+        const parts = Array.from({ length: total }, (_, i) => q(partName(i)));
+        return `🧩 ${name} was sent in ${total} parts. Rejoin the original file with:\n`
+          + `macOS/Linux:  cat ${parts.join(' ')} > ${q(name)}\n`
+          + `Windows:  copy /b ${parts.join('+')} ${q(name)}`;
       }
 
       // ── Auth ──────────────────────────────────────────────────────────────
@@ -1125,13 +1137,24 @@
         updatePlaceholder();
       }
 
+      // Keep in sync with SEND_TEXT_MAX / RICH_TEXT_MAX in functions/api/send.js.
+      const SEND_TEXT_MAX = 4096;
+      const RICH_TEXT_MAX = 32768;
+
       function updateCharCounter() {
         const len = textInput.value.length;
-        if (len >= 3900) {
-          charCounter.textContent = `${len}/4096`;
-          charCounter.style.color = len >= 4000 ? '#e05252' : '#666';
-        } else {
+        if (!len) {
           charCounter.textContent = '';
+        } else if (len <= SEND_TEXT_MAX) {
+          // Near the classic message limit, warn like before.
+          charCounter.textContent = len >= 3900 ? `${len}/4096` : '';
+          charCounter.style.color = len >= 4000 ? '#e05252' : '#666';
+        } else if (len <= RICH_TEXT_MAX) {
+          charCounter.textContent = `${len}/32,768 · rich message`;
+          charCounter.style.color = '#666';
+        } else {
+          charCounter.textContent = `${len} characters · will send as .txt`;
+          charCounter.style.color = '#666';
         }
       }
 
@@ -1454,6 +1477,12 @@
                   if (!result) return;
                   links.push(buildTgLink(result.chatId, result.messageId));
                 }
+                // Close the series with the rejoin instructions.
+                setSendingLabel('Sending rejoin instructions…');
+                showSending();
+                const rejoin = await sendPayload('text', null, rejoinMessage(file.name, parts.length), token);
+                if (!rejoin) return;
+                links.push(buildTgLink(rejoin.chatId, rejoin.messageId));
                 continue;
               }
               setSendingLabel(prefix ? `Sending ${prefix}…` : 'Sending…');
