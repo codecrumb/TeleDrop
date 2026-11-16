@@ -1459,13 +1459,21 @@
               if (file.size > PART_SIZE) {
                 const parts = splitFile(file);
                 let lastPartId = null;
+                // One percent for the whole file (TeleHost-style): bytes sent
+                // so far plus the current part's fraction, so it climbs 0→100%
+                // exactly once. The label still names the part uploading.
+                let sentBytes = 0;
                 for (let p = 0; p < parts.length; p++) {
                   const base = `Sending ${prefix ? prefix + ' · ' : ''}part ${p + 1} of ${parts.length}`;
-                  setSendingLabel(progressLabeler(base)(0));
+                  const label = progressLabeler(base);
+                  const onProgress = f => label(
+                    f >= 1 ? 1 : Math.min(0.999, (sentBytes + f * parts[p].size) / file.size));
+                  setSendingLabel(onProgress(0));
                   showSending();
                   const result = await sendPayload('file', parts[p], null, token, p === 0 ? caption : '',
-                    progressLabeler(base));
+                    onProgress);
                   if (!result) return;
+                  sentBytes += parts[p].size;
                   lastPartId = result.messageId;
                   links.push(buildTgLink(result.chatId, result.messageId));
                 }
